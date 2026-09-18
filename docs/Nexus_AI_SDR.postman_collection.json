@@ -1,0 +1,376 @@
+{
+  "info": {
+    "_postman_id": "nexus-ai-sdr-collection-2026",
+    "name": "NEXUS AI SDR API Collection",
+    "description": "Comprehensive Postman API collection for Nexus Mini AI SDR platform covering Authentication, Lead Management, Multi-Agent Orchestration, Activity Audits, and Settings.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lead_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alex.rivera@nexus.ai\",\n  \"password\": \"password123\",\n  \"full_name\": \"Alex Rivera\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login (Get JWT Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('auth_token', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo@nexus.ai\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Leads Management",
+      "item": [
+        {
+          "name": "Get Pipeline Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "metrics"]
+            }
+          }
+        },
+        {
+          "name": "List / Filter Leads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads?search=&status=ALL&fit_category=ALL&skip=0&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["leads"],
+              "query": [
+                {"key": "search", "value": ""},
+                {"key": "status", "value": "ALL"},
+                {"key": "fit_category", "value": "ALL"},
+                {"key": "skip", "value": "0"},
+                {"key": "limit", "value": "50"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Lead",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.id) {",
+                  "    pm.collectionVariables.set('lead_id', jsonData.id.toString());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"HyperCloud Analytics\",\n  \"contact_name\": \"Marcus Brody\",\n  \"contact_email\": \"mbrody@hypercloud.io\",\n  \"role\": \"VP of Revenue Operations\",\n  \"website\": \"https://hypercloud.io\",\n  \"industry\": \"B2B SaaS / Big Data\",\n  \"company_size\": \"220 employees\",\n  \"location\": \"Denver, CO\",\n  \"notes\": \"Expanding sales team and looking to cut down SDR research cycle times.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/leads",
+              "host": ["{{base_url}}"],
+              "path": ["leads"]
+            }
+          }
+        },
+        {
+          "name": "Get Lead Details by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Lead / Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONTACTED\",\n  \"notes\": \"Initial outreach email dispatched; positive prospect intent.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Multi-Agent AI Workflow",
+      "item": [
+        {
+          "name": "Run Research Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/research",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "research"]
+            }
+          }
+        },
+        {
+          "name": "Run Qualification Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/qualify",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "qualify"]
+            }
+          }
+        },
+        {
+          "name": "Run Email Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/email",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "email"]
+            }
+          }
+        },
+        {
+          "name": "Run Full Multi-Agent Pipeline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/pipeline",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "pipeline"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Activity & Audit Trail",
+      "item": [
+        {
+          "name": "Get Lead Activity History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/activity",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "activity"]
+            }
+          }
+        },
+        {
+          "name": "Get Global Activity Stream",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/activities?limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["activities"],
+              "query": [
+                {"key": "limit", "value": "50"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Settings & Health",
+      "item": [
+        {
+          "name": "System Status & ICP Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/settings/system-status",
+              "host": ["{{base_url}}"],
+              "path": ["settings", "system-status"]
+            }
+          }
+        },
+        {
+          "name": "Root Healthcheck",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/health",
+              "host": ["http://localhost:8000"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

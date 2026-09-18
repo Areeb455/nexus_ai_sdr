@@ -1,0 +1,44 @@
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict
+
+class ResearchAgentOutput(BaseModel):
+    summary: str = Field(..., description="High-level executive summary of company and business model")
+    company_overview: str = Field(..., description="Detailed breakdown of operations, market positioning, target audience")
+    target_pain_points: List[str] = Field(default_factory=list, description="Specific operational, technical, or revenue bottlenecks")
+    key_decision_makers: List[Dict[str, Any]] = Field(default_factory=list, description="Profiles and priorities of relevant leaders")
+    technology_stack: List[str] = Field(default_factory=list, description="Detected CRM, sales tools, cloud infrastructure, or platforms")
+    growth_signals: List[str] = Field(default_factory=list, description="Recent funding, hiring surges, product launches, expansions")
+    sources: List[str] = Field(default_factory=list, description="Web domains and information sources researched")
+    confidence_score: float = Field(0.85, description="Confidence score from 0.0 to 1.0")
+    model_config = ConfigDict(from_attributes=True)
+
+class QualificationAgentOutput(BaseModel):
+    score: int = Field(..., ge=0, le=100, description="Overall ICP fit score between 0 and 100")
+    fit_category: str = Field(..., description="HIGH_FIT, MEDIUM_FIT, or LOW_FIT")
+    reasoning: str = Field(..., description="Detailed justification behind the score and evaluation")
+    positive_signals: List[str] = Field(default_factory=list, description="Signals supporting qualification")
+    negative_signals: List[str] = Field(default_factory=list, description="Disqualifying factors, gaps, or risks")
+    icp_fit_breakdown: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Detailed breakdown of role, industry, company size, and budget potential"
+    )
+    recommendation: Optional[str] = Field(None, description="Recommended next action (e.g. PRIORITY_OUTREACH, NURTURE, DISQUALIFY)")
+    model_config = ConfigDict(from_attributes=True)
+
+class EmailAgentOutput(BaseModel):
+    subject: str = Field(..., description="Compelling, personalized email subject line")
+    body: str = Field(..., description="Hyper-personalized email copy referencing specific pain points and company context")
+    follow_up_subject: Optional[str] = Field(None, description="Subject for secondary touchpoint (3 days later)")
+    follow_up_body: Optional[str] = Field(None, description="Value-oriented bump follow-up email")
+    personalization_rationale: Optional[str] = Field(None, description="Explanation of why hooks and proof points were selected")
+    tone: str = Field("professional_concise", description="Tone used for the email")
+    model_config = ConfigDict(from_attributes=True)
+
+class AgentPipelineResponse(BaseModel):
+    lead_id: int
+    status: str
+    message: str
+    research: Optional[ResearchAgentOutput] = None
+    qualification: Optional[QualificationAgentOutput] = None
+    email: Optional[EmailAgentOutput] = None
