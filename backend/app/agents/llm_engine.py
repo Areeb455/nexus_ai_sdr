@@ -173,6 +173,8 @@ class LLMEngine:
             return self._heuristic_qualification(user_prompt)
         elif "Email Agent" in system_prompt or "email" in system_prompt.lower():
             return self._heuristic_email(user_prompt)
+        elif "prospect" in system_prompt.lower() or "lead" in system_prompt.lower():
+            return self._heuristic_prospecting(user_prompt)
         return {"status": "success", "notes": "Dynamic heuristic result generated."}
 
     def _extract_field(self, text: str, field_name: str, default: str = "") -> str:
@@ -180,6 +182,30 @@ class LLMEngine:
         if match:
             return match.group(1).strip()
         return default
+
+    def _heuristic_prospecting(self, prompt: str) -> Dict[str, Any]:
+        company = self._extract_field(prompt, "Target Company/Domain", "Target Enterprise")
+        clean_company = company.replace("https://", "").replace("http://", "").split("/")[0].split(".")[0].capitalize()
+        domain = company if "." in company else f"{company.lower()}.com"
+        
+        contact_name = self._extract_field(prompt, "Verified Executive Buyer", "")
+        if not contact_name:
+            contact_name = f"Head of Operations ({clean_company})"
+        
+        role = self._extract_field(prompt, "Verified Executive Position", "VP of Revenue Operations")
+        email = self._extract_field(prompt, "Verified Corporate Email", f"contact@{domain}")
+        
+        return {
+            "company_name": clean_company,
+            "website": f"https://{domain}",
+            "industry": "B2B Technology & Software",
+            "company_size": "50-200 employees",
+            "location": "San Francisco, CA",
+            "contact_name": contact_name,
+            "role": role,
+            "contact_email": email,
+            "notes": f"Autonomous lead discovered for {clean_company} to accelerate outbound pipeline."
+        }
 
     def _heuristic_research(self, prompt: str) -> Dict[str, Any]:
         company = self._extract_field(prompt, "Company", "Target Enterprise")

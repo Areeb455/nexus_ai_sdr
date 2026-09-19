@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from app.schemas.lead import (
 from app.services import lead_service
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 class CompanyExtractRequest(BaseModel):
     query: str
@@ -102,8 +105,18 @@ Respond ONLY with a valid JSON object matching:
 
         extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
 
+        # Resilient parsing if LLM nested keys under company_profile or company
+        comp_profile = extracted.get("company_profile") if isinstance(extracted.get("company_profile"), dict) else {}
+        if not comp_profile and isinstance(extracted.get("company"), dict):
+            comp_profile = extracted.get("company")
+
+        extracted_comp_name = comp_profile.get("company_name") or extracted.get("company_name")
+        extracted_website = comp_profile.get("website") or extracted.get("website")
+        extracted_industry = comp_profile.get("industry") or extracted.get("industry")
+        extracted_size = comp_profile.get("estimated_size") or comp_profile.get("company_size") or extracted.get("company_size")
+
         domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com")
-        clean_website = extracted.get("website") or (f"https://{domain_part}")
+        clean_website = extracted_website or (f"https://{domain_part}")
         clean_company = web_intel.get("company_name") or domain_part.split(".")[0].capitalize()
         
         # Priority: Hunter.io verified contact > Gemini extracted
@@ -112,7 +125,7 @@ Respond ONLY with a valid JSON object matching:
             contact_name = bc["name"]
             role = bc["position"]
             contact_email = bc["email"]
-            company_name = hunter_intel.get("company_name") or extracted.get("company_name", clean_company)
+            company_name = hunter_intel.get("company_name") or extracted_comp_name or clean_company
 
             # If Hunter gave generic fallback but LLM/Web found specific named executive/founder:
             if (not contact_name or contact_name in ["Key Decision Maker", "Executive Leader"]) and extracted.get("contact_name") and extracted.get("contact_name") not in ["Key Decision Maker", "Executive Leader"]:
@@ -126,7 +139,7 @@ Respond ONLY with a valid JSON object matching:
             role = extracted.get("role") or "VP of Revenue Operations"
             email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
             contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
-            company_name = extracted.get("company_name", clean_company)
+            company_name = extracted_comp_name or clean_company
             notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company} based on live web presence.")
 
         lead = Lead(
@@ -136,8 +149,8 @@ Respond ONLY with a valid JSON object matching:
             contact_email=contact_email,
             role=role,
             website=clean_website,
-            industry=extracted.get("industry", "B2B Technology"),
-            company_size=extracted.get("company_size") or verified_metrics.get("headcount", "100-500 employees"),
+            industry=extracted_industry or "B2B Technology",
+            company_size=extracted_size or verified_metrics.get("headcount", "100-500 employees"),
             location=extracted.get("location") or verified_metrics.get("headquarters", "San Francisco, CA"),
             notes=notes,
             status=LeadStatus.NEW.value
@@ -155,7 +168,7 @@ Respond ONLY with a valid JSON object matching:
         raise
     except Exception as e:
         import traceback
-        logging.getLogger(__name__).error(f"[AutonomousHunt] Execution error: {e}\n{traceback.format_exc()}")
+        logger.error(f"[AutonomousHunt] Execution error: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Autonomous hunt error: {str(e)}"

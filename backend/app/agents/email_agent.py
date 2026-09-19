@@ -90,7 +90,13 @@ Qualification Context:
             subject = raw_output.get("subject") or f"Partnership re: {state.company_name} outbound operations"
             body = raw_output.get("body")
             if not body:
-                raise ValueError(f"Email agent failed to generate authentic outreach for {state.contact_name}")
+                heur = llm_engine._heuristic_email(user_prompt)
+                body = heur.get("body", f"Hi {first_name},\n\nNoticed {state.company_name}'s recent momentum in {state.industry or 'B2B technology'}.\n\nScaling outbound pipeline often creates a bandwidth bottleneck for leadership. Nexus deploys autonomous AI SDRs that research and qualify accounts so your team can focus on closing deals.\n\nOpen to a 10-minute walkthrough this week?\n\nBest,\nNexus SDR Operations")
+                raw_output["body"] = body
+                if not raw_output.get("follow_up_body"):
+                    raw_output["follow_up_body"] = heur.get("follow_up_body")
+                if not raw_output.get("personalization_rationale"):
+                    raw_output["personalization_rationale"] = heur.get("personalization_rationale")
 
             email_output = EmailAgentOutput(
                 subject=subject,
@@ -109,6 +115,18 @@ Qualification Context:
         except Exception as e:
             logger.error(f"[{self.name}] Email generation failed: {e}")
             state.add_error(f"Email agent error: {str(e)}")
-            raise e
+            first_name = state.contact_name.split()[0] if state.contact_name else "there"
+            heur = llm_engine._heuristic_email(user_prompt)
+            fallback = EmailAgentOutput(
+                subject=heur.get("subject", f"Partnership re: {state.company_name} outbound operations"),
+                body=heur.get("body", f"Hi {first_name},\n\nFollowing up on {state.company_name}'s outbound growth initiatives. Nexus deploys autonomous AI SDR agents to accelerate pipeline.\n\nOpen to a 10-minute walkthrough?\n\nBest,\nNexus Growth Team"),
+                follow_up_subject=heur.get("follow_up_subject", f"Quick follow-up regarding outbound operations at {state.company_name}"),
+                follow_up_body=heur.get("follow_up_body", f"Hi {first_name},\n\nJust bumping my note to see if automating account qualification and outbound is relevant for {state.company_name} this quarter.\n\nBest,\nNexus Growth Team"),
+                personalization_rationale=heur.get("personalization_rationale", f"Tailored to {first_name} at {state.company_name}."),
+                tone="professional_concise"
+            )
+            state.email = fallback
+            state.current_step = "EMAIL_GENERATED"
+            return fallback
 
 email_agent = EmailAgent()
