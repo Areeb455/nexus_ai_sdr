@@ -23,12 +23,22 @@ class ResearchAgent:
         
         # 1. Gather web signals if website is provided
         website_snippet = ""
+        hunter_intel = None
         if state.website:
             website_snippet = await self._fetch_website_text(state.website)
             if website_snippet:
                 state.add_log(f"[{self.name}] Successfully inspected public metadata from {state.website}")
             else:
                 state.add_log(f"[{self.name}] Website {state.website} unreachable or timed out; falling back to knowledge synthesis")
+
+            # Hunter.io verified contact enrichment
+            try:
+                from app.services.hunter_service import hunter_service
+                hunter_intel = await hunter_service.search_domain(state.website)
+                if hunter_intel and hunter_intel.get("all_contacts"):
+                    state.add_log(f"[{self.name}] Enriched with {hunter_intel.get('total_emails_found')} Hunter.io verified executives (Pattern: {hunter_intel.get('email_pattern')})")
+            except Exception as e:
+                logger.warning(f"[{self.name}] Hunter enrichment failed: {e}")
 
         # 2. Formulate Prompt for Structured Research
         system_prompt = """You are the Nexus Research Agent, an expert AI Sales Intelligence Researcher.
@@ -43,6 +53,11 @@ You must extract:
 7. sources: List of source URLs or domain references.
 8. confidence_score: Float between 0.0 and 1.0."""
 
+        hunter_context = ""
+        if hunter_intel and hunter_intel.get("all_contacts"):
+            contacts_list = ", ".join([f"{c['name']} ({c['position']})" for c in hunter_intel["all_contacts"]])
+            hunter_context = f"Hunter.io Verified Directory: {contacts_list}. Email Pattern: {hunter_intel.get('email_pattern')}"
+
         user_prompt = f"""
 Company: {state.company_name}
 Contact: {state.contact_name}
@@ -53,6 +68,7 @@ Website: {state.website or 'N/A'}
 Location: {state.location or 'N/A'}
 Supplied Notes: {state.notes or 'None'}
 Scraped Website Snippet: {website_snippet or 'None'}
+Hunter Verified Contacts: {hunter_context or 'None'}
 """
 
         try:

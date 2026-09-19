@@ -38,18 +38,37 @@ async def autonomous_hunt(
     from app.agents.llm_engine import llm_engine
     from app.agents.research_agent import research_agent
     from app.agents.orchestrator import orchestrator
+    from app.services.hunter_service import hunter_service
 
     query = req.query.strip()
     website_text = ""
     if "." in query or query.startswith("http"):
         website_text = await research_agent._fetch_website_text(query)
 
+    # 1. Query Hunter.io for real verified executive intelligence
+    hunter_intel = await hunter_service.search_domain(query)
+    hunter_context = ""
+    if hunter_intel and hunter_intel.get("best_contact"):
+        bc = hunter_intel["best_contact"]
+        hunter_context = f"""
+HUNTER.IO VERIFIED CORPORATE INTELLIGENCE:
+- Company: {hunter_intel.get('company_name')}
+- Verified Email Pattern: {hunter_intel.get('email_pattern')}
+- Total Verified Emails Found: {hunter_intel.get('total_emails_found')}
+- Verified Executive Buyer: {bc['name']}
+- Verified Executive Position: {bc['position']}
+- Verified Corporate Email: {bc['email']} (Confidence: {bc['confidence']}%, Status: {bc['verification_status']})
+- LinkedIn: {bc.get('linkedin') or 'N/A'}
+NOTE: Use this real verified executive and company profile as your primary target persona.
+"""
+
     prompt = f"""You are the Nexus Autonomous Lead Prospecting Agent.
 Target Company/Domain: {query}
 Live Website Snippet: {website_text[:2000] if website_text else 'None'}
+{hunter_context}
 
 Extract real company intelligence and identify the single most relevant B2B buyer persona to prospect with Nexus AI SDR.
-Identify a realistic executive decision maker (e.g. VP of Sales, Head of Revenue Operations, Chief Commercial Officer, VP of Demand Gen).
+If Hunter.io verified executive intelligence is provided above, utilize that real verified person and email format.
 
 Respond ONLY with a valid JSON object matching:
 {{
@@ -58,24 +77,36 @@ Respond ONLY with a valid JSON object matching:
   "industry": "Specific B2B segment (e.g. B2B SaaS / Developer Infrastructure / Fintech)",
   "company_size": "Estimated employee count (e.g. 150-300 employees)",
   "location": "Headquarters city and state/country (e.g. San Francisco, CA)",
-  "contact_name": "Realistic full name of executive buyer (e.g. Sarah Jenkins, Marcus Vance, Elena Rostova)",
-  "role": "Executive title (e.g. VP of Revenue Operations, Head of Global Sales)",
-  "contact_email": "Professional email (e.g. s.jenkins@domain.com)",
-  "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation and their core pipeline friction."
+  "contact_name": "Full name of executive buyer (prefer Hunter.io verified executive if present)",
+  "role": "Executive title (e.g. Head of Engineering, VP of Sales, Head of RevOps)",
+  "contact_email": "Professional email (prefer Hunter.io verified email)",
+  "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation, noting Hunter.io verification if present."
 }}"""
 
     extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
 
     domain_part = query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com"
     clean_website = extracted.get("website") or (f"https://{domain_part}")
-    contact_name = extracted.get("contact_name", "Alex Mercer")
-    role = extracted.get("role", "VP of Revenue Operations")
-    email_user = contact_name.lower().replace(" ", ".")
-    contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+    
+    # Priority: Hunter.io verified contact > Gemini extracted
+    if hunter_intel and hunter_intel.get("best_contact"):
+        bc = hunter_intel["best_contact"]
+        contact_name = bc["name"]
+        role = bc["position"]
+        contact_email = bc["email"]
+        company_name = hunter_intel.get("company_name") or extracted.get("company_name", domain_part.split(".")[0].capitalize())
+        notes = extracted.get("notes", "") + f" [Verified via Hunter.io: {bc['confidence']}% confidence]"
+    else:
+        contact_name = extracted.get("contact_name", "Alex Mercer")
+        role = extracted.get("role", "VP of Revenue Operations")
+        email_user = contact_name.lower().replace(" ", ".")
+        contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+        company_name = extracted.get("company_name", domain_part.split(".")[0].capitalize())
+        notes = extracted.get("notes", f"Autonomous lead discovered for {domain_part}.")
 
     lead = Lead(
         user_id=current_user.id,
-        company_name=extracted.get("company_name", domain_part.split(".")[0].capitalize()),
+        company_name=company_name,
         contact_name=contact_name,
         contact_email=contact_email,
         role=role,
@@ -83,7 +114,7 @@ Respond ONLY with a valid JSON object matching:
         industry=extracted.get("industry", "B2B Technology"),
         company_size=extracted.get("company_size", "100-500 employees"),
         location=extracted.get("location", "San Francisco, CA"),
-        notes=extracted.get("notes", f"Autonomous lead discovered for {domain_part}."),
+        notes=notes,
         status=LeadStatus.NEW.value
     )
     db.add(lead)
