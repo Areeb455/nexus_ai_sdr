@@ -29,7 +29,7 @@ class LLMEngine:
 
     def get_active_provider(self) -> str:
         if self.gemini_key:
-            return "Google Gemini (gemini-1.5-flash)"
+            return "Google Gemini (gemini-3.6-flash / 3.5-flash)"
         if self.openai_key:
             return "OpenAI (gpt-4o-mini)"
         return "Nexus Heuristic AI Engine (Dynamic Local Analysis)"
@@ -43,11 +43,18 @@ class LLMEngine:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.gemini_key)
-                model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"response_mime_type": "application/json"})
-                full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with valid JSON."
-                response = model.generate_content(full_prompt)
-                cleaned_text = self._clean_json_str(response.text)
-                return json.loads(cleaned_text)
+                for model_choice in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-1.5-flash"]:
+                    try:
+                        model = genai.GenerativeModel(model_choice)
+                        full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with valid JSON."
+                        response = model.generate_content(full_prompt)
+                        cleaned_text = self._clean_json_str(response.text)
+                        parsed = json.loads(cleaned_text)
+                        if isinstance(parsed, dict) and len(parsed) > 0:
+                            return parsed
+                    except Exception as model_err:
+                        logger.debug(f"Gemini {model_choice} attempt: {model_err}")
+                        continue
             except Exception as e:
                 logger.warning(f"Gemini API invocation failed: {e}. Falling back to OpenAI or Heuristics.")
 
