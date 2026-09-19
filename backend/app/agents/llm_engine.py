@@ -52,7 +52,7 @@ class LLMEngine:
 
     def get_active_provider(self) -> str:
         if self.vertex_client:
-            return "Google Cloud Vertex AI (gemini-2.5-flash via Service Account)"
+            return "Google Cloud Vertex AI (gemini-3.7-flash via Service Account)"
         if self.gemini_key:
             return "Google Gemini AI Studio (gemini-2.5-flash)"
         if self.openai_key:
@@ -65,19 +65,20 @@ class LLMEngine:
         """
         # 1. Try Vertex AI with service account credentials
         if self.vertex_client:
-            try:
-                full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with a valid JSON object. No Markdown code blocks, no explanation text."
-                response = self.vertex_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=full_prompt
-                )
-                if response and response.text:
-                    cleaned_text = self._clean_json_str(response.text)
-                    parsed = json.loads(cleaned_text)
-                    if isinstance(parsed, dict) and len(parsed) > 0:
-                        return parsed
-            except Exception as e:
-                logger.warning(f"Vertex AI invocation failed: {e}. Falling back to alternative providers.")
+            for model_choice in ["gemini-3.7-flash", "gemini-2.5-flash"]:
+                try:
+                    full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with a valid JSON object. No Markdown code blocks, no explanation text."
+                    response = self.vertex_client.models.generate_content(
+                        model=model_choice,
+                        contents=full_prompt
+                    )
+                    if response and response.text:
+                        cleaned_text = self._clean_json_str(response.text)
+                        parsed = json.loads(cleaned_text)
+                        if isinstance(parsed, dict) and len(parsed) > 0:
+                            return parsed
+                except Exception as e:
+                    logger.warning(f"Vertex AI ({model_choice}) invocation failed: {e}.")
 
         # 2. Try Google AI Studio Gemini API if configured
         if self.gemini_key:
