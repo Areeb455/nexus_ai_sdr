@@ -35,7 +35,7 @@ graph TB
         Agent3["3. Email Agent<br/>(Hyper-Personalized Outreach, Bump, Rationale)"]
         
         LLMEngine["Unified LLM Provider Engine"]
-        GeminiAPI["Google Gemini 1.5 Flash / Pro"]
+        GeminiAPI["Google Cloud Vertex AI (Gemini 3.7 Flash) / Gemini API"]
         OpenAIAPI["OpenAI GPT-4o-mini"]
         HeuristicAI["Deterministic Heuristic Fallback Engine"]
         
