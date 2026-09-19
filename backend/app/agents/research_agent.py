@@ -44,6 +44,7 @@ Your mission is to analyze a real company and prospect to generate rich, structu
 CRITICAL INSTRUCTION:
 - Ground your analysis strictly in the LIVE WEB INTELLIGENCE and Hunter.io data provided below.
 - Do NOT output generic filler phrases like 'modernizing outbound sales execution' or 'established organization in the B2B Technology sector'.
+- NEVER guess or hallucinate generic services like 'branding agency', 'web design', or 'digital marketing'. If intelligence mentions real-time sign language, developer tooling, payments, or observability, anchor strictly on that actual product.
 - Reference real products, real revenue, real headcount, or real funding milestones discovered in the intelligence.
 
 You must extract:

@@ -91,9 +91,9 @@ class LLMEngine:
 
     def get_active_provider(self) -> str:
         if self.vertex_client:
-            return "Google Cloud Vertex AI (gemini-2.5-flash via Service Account)"
+            return "Google Cloud Vertex AI (gemini-3.6-flash via Service Account)"
         if self.gemini_key:
-            return "Google Gemini AI Studio (gemini-2.5-flash)"
+            return "Google Gemini AI Studio (gemini-3.6-flash)"
         if self.openai_key:
             return "OpenAI (gpt-4o-mini)"
         return "Nexus Heuristic AI Engine (Dynamic Local Analysis)"
@@ -104,7 +104,7 @@ class LLMEngine:
         """
         # 1. Try Vertex AI with service account credentials
         if self.vertex_client:
-            for model_choice in ["gemini-2.5-flash", "gemini-3.7-flash", "gemini-3.6-flash"]:
+            for model_choice in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
                 try:
                     full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with a valid JSON object. No Markdown code blocks, no explanation text."
                     response = self.vertex_client.models.generate_content(
@@ -124,7 +124,7 @@ class LLMEngine:
             try:
                 from google import genai
                 g_client = genai.Client(api_key=self.gemini_key)
-                for model_choice in ["gemini-2.5-flash", "gemini-3.7-flash", "gemini-3.6-flash"]:
+                for model_choice in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
                     try:
                         full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with valid JSON."
                         response = g_client.models.generate_content(

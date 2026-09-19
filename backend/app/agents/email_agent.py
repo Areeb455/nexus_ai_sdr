@@ -43,6 +43,8 @@ Your goal is to write a compelling, hyper-personalized cold outreach email and a
 
 Guidelines:
 - CRITICAL: ZERO AI SLOP. Do NOT hallucinate fabricated statistics like 'SDRs spend 65% of their day' or '3.4x lift in meetings' or '42% reduction in CAC'.
+- NEVER use placeholder brackets like 'Hi [Prospect Name]' or 'Hi [Name]'. Always greet with the contact's real first name (e.g. 'Hi Pranjal' or 'Hi Eileen'). If contact name is unavailable or generic, use 'Hi {Company} Team' or 'Hi there'.
+- NEVER guess or hallucinate fake services like 'branding and web design agency'. Ground the pitch strictly in their real products (e.g. sign language AI, developer tooling, payments, observability).
 - Reference ONLY verified company facts, real products, and genuine operational scale found in the research context.
 - Personalize based on the lead's role, company context, and detected pain points.
 - Never use generic clichés like 'I hope this email finds you well' or 'Just checking in'.
