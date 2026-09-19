@@ -12,10 +12,9 @@ import {
   Layers, 
   Users2, 
   MapPin, 
-  FileText, 
   ArrowLeft, 
   Sparkles,
-  Check
+  Loader2
 } from "lucide-react";
 import { api } from "@/lib/api";
 import AutonomousCompanyHunter from "@/components/AutonomousCompanyHunter";
@@ -97,38 +96,38 @@ export default function NewLeadPage() {
       <div className="flex items-center justify-between">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-mono text-zinc-500 hover:text-zinc-200 transition-colors group"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Pipeline Dashboard
+          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+          <span>BACK TO DASHBOARD</span>
         </Link>
-        <span className="text-xs text-indigo-400 font-medium flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          Autonomous Multi-Agent Enrichment Ready
+        <span className="text-[11px] text-zinc-500 font-mono uppercase tracking-wider flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-zinc-400" />
+          AUTONOMOUS MULTI-AGENT INGESTION
         </span>
       </div>
 
       {/* Autonomous AI Hunter */}
       <AutonomousCompanyHunter />
 
-      <div className="glass-panel p-8">
+      <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 sm:p-8 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04),0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
             Manual Prospect Account Creation
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-zinc-500 font-sans mt-0.5">
             Input prospect company details to initialize the Research, Qualification, and Email generation agents.
           </p>
         </div>
 
         {/* AI Autonomous Company Extractor Bar */}
-        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/20 space-y-3">
+        <div className="mt-6 p-4 rounded-xl bg-[#060608] border border-white/[0.08] space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              ⚡ Autonomous AI Company Enrichment:
+            <span className="text-[11px] font-mono text-zinc-300 flex items-center gap-1.5 uppercase">
+              <Sparkles className="w-3.5 h-3.5 text-white" />
+              Autonomous AI Company Enrichment
             </span>
-            <span className="text-[11px] text-indigo-300/70">Enter a website or company name to auto-fill</span>
+            <span className="text-[10px] font-mono text-zinc-500">Enter a website or company name to auto-fill</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -137,7 +136,7 @@ export default function NewLeadPage() {
               value={extractQuery}
               onChange={(e) => setExtractQuery(e.target.value)}
               placeholder="e.g. stripe.com, figma.com, or Datadog"
-              className="flex-1 px-3 py-2 bg-slate-900/90 border border-slate-700/60 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="flex-1 px-3.5 py-2 bg-zinc-950 border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -149,17 +148,17 @@ export default function NewLeadPage() {
               type="button"
               onClick={handleAutoExtract}
               disabled={extracting || !extractQuery.trim()}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition-all flex items-center gap-1.5 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-semibold tracking-tight shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
             >
               {extracting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Extracting...
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Enriching...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Auto-Fill with AI
+                  <Sparkles className="w-3.5 h-3.5 text-black" />
+                  <span>Auto-Fill with AI</span>
                 </>
               )}
             </button>
@@ -167,13 +166,12 @@ export default function NewLeadPage() {
         </div>
 
         {/* Quick Evaluator Presets Bar */}
-        <div className="mt-4 p-4 rounded-xl bg-slate-900/80 border border-white/5 space-y-2.5">
+        <div className="mt-3.5 p-3.5 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              1-Click Demo Evaluation Presets:
+            <span className="text-[10px] font-mono uppercase text-zinc-500 flex items-center gap-1.5">
+              1-CLICK DEMO PRESETS
             </span>
-            <span className="text-[11px] text-slate-500">Auto-populates realistic data across ICP tiers</span>
+            <span className="text-[10px] font-mono text-zinc-600">Auto-populates realistic data across ICP tiers</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -192,9 +190,9 @@ export default function NewLeadPage() {
                   notes: "Fast-growing issue tracking platform ($100M ARR, $2.5B valuation). High-efficiency team scaling enterprise GTM motion.",
                 })
               }
-              className="px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-medium transition-colors"
+              className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-emerald-500/25 text-emerald-400 text-xs font-mono transition-colors cursor-pointer"
             >
-              🌟 High Fit: Linear (Conor @ linear.app)
+              ★ High Fit: Linear (Conor @ linear.app)
             </button>
 
             <button
@@ -212,7 +210,7 @@ export default function NewLeadPage() {
                   notes: "Global payments infrastructure ($19.4B ARR, $159B valuation). Enterprise scale with extensive global sales operations.",
                 })
               }
-              className="px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition-colors"
+              className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-white/[0.08] text-zinc-300 text-xs font-mono transition-colors cursor-pointer"
             >
               ⚡ Enterprise: Stripe (Eileen, CRO @ stripe.com)
             </button>
@@ -232,30 +230,30 @@ export default function NewLeadPage() {
                   notes: "One-man craft shop making handmade goods. Solopreneur scale with zero outbound sales motion or software budget.",
                 })
               }
-              className="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-300 text-xs font-medium transition-colors"
+              className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-amber-500/25 text-amber-400 text-xs font-mono transition-colors cursor-pointer"
             >
-              ⚠️ Disqualify / Low Fit: Solo Potter (1 person)
+              ⚠️ Low Fit: Solo Potter (1 person)
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+          <div className="mt-4 p-3 rounded-xl bg-zinc-950 border border-red-500/30 text-red-400 text-xs font-mono">
             {error}
           </div>
         )}
 
         {/* Lead Form */}
-        <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Company Name */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Company Name <span className="text-rose-400">*</span>
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                Company Name <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Building2 className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Building2 className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -264,19 +262,19 @@ export default function NewLeadPage() {
                   value={formData.company_name}
                   onChange={handleChange}
                   placeholder="e.g. CloudScale Data"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Contact Name */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Contact Name <span className="text-rose-400">*</span>
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                Contact Name <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <User className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <User className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -285,19 +283,19 @@ export default function NewLeadPage() {
                   value={formData.contact_name}
                   onChange={handleChange}
                   placeholder="e.g. Elena Rostova"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Role */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Role / Title
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Briefcase className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Briefcase className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -305,19 +303,19 @@ export default function NewLeadPage() {
                   value={formData.role}
                   onChange={handleChange}
                   placeholder="e.g. VP of Revenue Operations"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Work Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Mail className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Mail className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="email"
@@ -325,19 +323,19 @@ export default function NewLeadPage() {
                   value={formData.contact_email}
                   onChange={handleChange}
                   placeholder="e.g. elena@cloudscaledata.io"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Website */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Website URL
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Globe className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Globe className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -345,19 +343,19 @@ export default function NewLeadPage() {
                   value={formData.website}
                   onChange={handleChange}
                   placeholder="https://cloudscaledata.io"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Industry */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Industry / Vertical
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Layers className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Layers className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -365,19 +363,19 @@ export default function NewLeadPage() {
                   value={formData.industry}
                   onChange={handleChange}
                   placeholder="e.g. B2B SaaS / Data Platforms"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Company Size */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Company Size
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <Users2 className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <Users2 className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -385,19 +383,19 @@ export default function NewLeadPage() {
                   value={formData.company_size}
                   onChange={handleChange}
                   placeholder="e.g. 150 employees"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
 
             {/* Location */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
                 Headquarters Location
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <MapPin className="w-4 h-4" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                  <MapPin className="w-3.5 h-3.5" />
                 </div>
                 <input
                   type="text"
@@ -405,7 +403,7 @@ export default function NewLeadPage() {
                   value={formData.location}
                   onChange={handleChange}
                   placeholder="e.g. San Francisco, CA"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-9 pr-3.5 py-2 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30"
                 />
               </div>
             </div>
@@ -413,7 +411,7 @@ export default function NewLeadPage() {
 
           {/* Notes / Context */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
               Sales Intelligence Notes / Known Signals
             </label>
             <div className="relative">
@@ -423,29 +421,32 @@ export default function NewLeadPage() {
                 value={formData.notes}
                 onChange={handleChange}
                 placeholder="Any supplied context, recent press, job postings, or SDR priorities..."
-                className="w-full p-3.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"
+                className="w-full p-3 bg-[#060608] border border-white/[0.08] rounded-xl text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 resize-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.06]">
             <Link
               href="/dashboard"
-              className="px-4 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 text-xs font-semibold transition-colors"
+              className="px-4 py-2 rounded-xl border border-white/[0.08] text-zinc-400 hover:text-white hover:bg-zinc-900 text-xs font-mono transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-semibold tracking-tight shadow-[0_0_15px_rgba(255,255,255,0.12)] transition-all disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                  <span>Creating...</span>
+                </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  Create Prospect & Launch Workspace
+                  <Sparkles className="w-3.5 h-3.5 text-black" />
+                  <span>Create Prospect & Launch Workspace</span>
                 </>
               )}
             </button>
