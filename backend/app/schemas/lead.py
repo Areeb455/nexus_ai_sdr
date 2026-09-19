@@ -6,7 +6,7 @@ from app.schemas.agent_schemas import ResearchAgentOutput, QualificationAgentOut
 class LeadBase(BaseModel):
     company_name: str
     contact_name: str
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     role: Optional[str] = None
     website: Optional[str] = None
     industry: Optional[str] = None
@@ -20,7 +20,7 @@ class LeadCreate(LeadBase):
 class LeadUpdate(BaseModel):
     company_name: Optional[str] = None
     contact_name: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     role: Optional[str] = None
     website: Optional[str] = None
     industry: Optional[str] = None

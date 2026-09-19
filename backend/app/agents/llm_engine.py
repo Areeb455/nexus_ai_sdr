@@ -184,16 +184,17 @@ class LLMEngine:
         return default
 
     def _heuristic_prospecting(self, prompt: str) -> Dict[str, Any]:
-        company = self._extract_field(prompt, "Target Company/Domain", "Target Enterprise")
-        clean_company = company.replace("https://", "").replace("http://", "").split("/")[0].split(".")[0].capitalize()
-        domain = company if "." in company else f"{company.lower()}.com"
+        company = self._extract_field(prompt, "Target Company/Domain", "Target Enterprise").strip()
+        clean_company = company.replace("https://", "").replace("http://", "").split("/")[0].split(".")[0].strip()
+        domain_name = re.sub(r"[^a-zA-Z0-9]", "", company.lower()) or "company"
+        domain = company.replace(" ", "") if "." in company else f"{domain_name}.com"
         
         contact_name = self._extract_field(prompt, "Verified Executive Buyer", "")
         if not contact_name:
             contact_name = f"Head of Operations ({clean_company})"
         
         role = self._extract_field(prompt, "Verified Executive Position", "VP of Revenue Operations")
-        email = self._extract_field(prompt, "Verified Corporate Email", f"contact@{domain}")
+        email = self._extract_field(prompt, "Verified Corporate Email", f"contact@{domain}").strip().replace(" ", "")
         
         return {
             "company_name": clean_company,

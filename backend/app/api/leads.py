@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -14,6 +15,22 @@ from app.services import lead_service
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+def sanitize_email(email: Optional[str], default_domain: str = "example.com") -> Optional[str]:
+    if not email:
+        return None
+    # Strip any whitespace
+    cleaned = re.sub(r"\s+", "", email).lower()
+    if "@" not in cleaned:
+        cleaned = f"contact@{cleaned}"
+    parts = cleaned.split("@")
+    user_part = re.sub(r"[^a-zA-Z0-9\._-]", "", parts[0]) or "contact"
+    domain_part = re.sub(r"[^a-zA-Z0-9\.-]", "", parts[1]) if len(parts) > 1 else default_domain
+    domain_part = domain_part.replace("..", ".").strip(".")
+    if not domain_part or "." not in domain_part:
+        domain_clean = re.sub(r"[^a-zA-Z0-9]", "", default_domain) or "company"
+        domain_part = f"{domain_clean}.com"
+    return f"{user_part}@{domain_part}"
 
 class CompanyExtractRequest(BaseModel):
     query: str
@@ -115,16 +132,19 @@ Respond ONLY with a valid JSON object matching:
         extracted_industry = comp_profile.get("industry") or extracted.get("industry")
         extracted_size = comp_profile.get("estimated_size") or comp_profile.get("company_size") or extracted.get("company_size")
 
-        domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com")
+        # Ensure domain_part is clean and has no spaces
+        safe_domain_base = re.sub(r'[^a-zA-Z0-9]', '', query.lower()) or "company"
+        domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0].strip().replace(" ", "") if "." in query else f"{safe_domain_base}.com")
+        domain_part = re.sub(r'\s+', '', domain_part)
         clean_website = extracted_website or (f"https://{domain_part}")
-        clean_company = web_intel.get("company_name") or domain_part.split(".")[0].capitalize()
+        clean_company = web_intel.get("company_name") or extracted_comp_name or query.strip()
         
         # Priority: Hunter.io verified contact > Gemini extracted
         if hunter_intel and hunter_intel.get("best_contact"):
             bc = hunter_intel["best_contact"]
             contact_name = bc["name"]
             role = bc["position"]
-            contact_email = bc["email"]
+            contact_email = sanitize_email(bc["email"], domain_part)
             company_name = hunter_intel.get("company_name") or extracted_comp_name or clean_company
 
             # If Hunter gave generic fallback but LLM/Web found specific named executive/founder:
@@ -137,8 +157,9 @@ Respond ONLY with a valid JSON object matching:
         else:
             contact_name = extracted.get("contact_name") or f"Head of Operations ({clean_company})"
             role = extracted.get("role") or "VP of Revenue Operations"
-            email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
-            contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+            email_user = re.sub(r'[^a-zA-Z0-9\._-]', '', contact_name.lower().replace(" ", ".")) or "contact"
+            raw_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+            contact_email = sanitize_email(raw_email, domain_part)
             company_name = extracted_comp_name or clean_company
             notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company} based on live web presence.")
 
@@ -352,7 +373,7 @@ def _build_lead_response(lead: Lead) -> LeadResponse:
         user_id=lead.user_id,
         company_name=lead.company_name,
         contact_name=lead.contact_name,
-        contact_email=lead.contact_email,
+        contact_email=sanitize_email(lead.contact_email),
         role=lead.role,
         website=lead.website,
         industry=lead.industry,
