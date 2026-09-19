@@ -19,7 +19,9 @@ import {
   RefreshCw, 
   Clock, 
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  ExternalLink,
+  ChevronRight
 } from "lucide-react";
 import { api, LeadSummaryItem, DashboardMetrics } from "@/lib/api";
 

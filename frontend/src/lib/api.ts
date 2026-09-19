@@ -165,6 +165,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    googleLogin: (credential: string) =>
+      request<{ access_token: string; user: User }>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ credential }),
+      }),
     getMe: () => request<User>("/auth/me"),
   },
   leads: {
