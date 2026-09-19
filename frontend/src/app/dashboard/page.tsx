@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { api, LeadSummaryItem, DashboardMetrics } from "@/lib/api";
 import AutonomousCompanyHunter from "@/components/AutonomousCompanyHunter";
+import CompanyLogo from "@/components/CompanyLogo";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -410,24 +411,31 @@ export default function DashboardPage() {
 
                     {/* Company & Domain */}
                     <td className="py-3.5 px-5">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-zinc-200 flex items-center gap-1.5">
-                          {lead.company_name}
-                          {lead.website && (
-                            <a
-                              href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-zinc-600 hover:text-white transition-colors"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          )}
-                        </span>
-                        <span className="text-[11px] font-mono text-zinc-500">
-                          {lead.industry || "B2B Tech"}
-                        </span>
+                      <div className="flex items-center gap-2.5">
+                        <CompanyLogo
+                          companyName={lead.company_name}
+                          website={lead.website}
+                          size="sm"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-zinc-200 flex items-center gap-1.5">
+                            {lead.company_name}
+                            {lead.website && (
+                              <a
+                                href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-zinc-600 hover:text-white transition-colors"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
+                          </span>
+                          <span className="text-[11px] font-mono text-zinc-500">
+                            {lead.industry || "B2B Tech"}
+                          </span>
+                        </div>
                       </div>
                     </td>
 

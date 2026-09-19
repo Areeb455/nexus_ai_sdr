@@ -36,6 +36,7 @@ import {
   EmailData, 
   ActivityLogItem 
 } from "@/lib/api";
+import CompanyLogo from "@/components/CompanyLogo";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -272,9 +273,12 @@ export default function LeadDetailPage() {
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           {/* Company & Contact Identity */}
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-white/[0.12] flex items-center justify-center font-mono font-bold text-white text-base shadow-inner shrink-0">
-              {lead.company_name.slice(0, 2).toUpperCase()}
-            </div>
+            <CompanyLogo
+              companyName={lead.company_name}
+              website={lead.website}
+              contactEmail={lead.contact_email}
+              size="lg"
+            />
 
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2.5">
