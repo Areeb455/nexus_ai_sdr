@@ -1,135 +1,258 @@
-Nexus AI SDR
+<div align="center">
 
-A multi-agent sales development platform. A user adds a lead (or enters a company domain), and three cooperating agents research the company, score it against an Ideal Customer Profile (ICP), and draft personalized outreach. Results are stored per lead and managed through a dashboard.
+# NEXUS AI SDR
 
-Frontend: https://nexus-sdr-frontend.onrender.com
-Backend API: https://nexus-sdr-backend.onrender.com
-API docs (Swagger): https://nexus-sdr-backend.onrender.com/docs
+## Autonomous Multi-Agent Sales Platform
 
-The services run on Render's free tier and spin down when idle. The first request after a period of inactivity can take up to a minute.
+Autonomous Sales Development Representative (SDR) powered by cooperating **Research**, **Qualification**, and **Email** agents built on **Gemini**, **FastAPI**, and **Next.js**.
 
-Demo account: demo@nexus.ai / password123
+</div>
 
-Features
-JWT authentication (register, login, protected routes)
-Lead management: create, list, search, filter by status and ICP tier, update, delete
-Three agents, runnable individually or as a single pipeline
-Autonomous prospecting: enter a company name or domain and the pipeline creates the lead and runs all three agents
-Activity trail and pipeline metrics on the dashboard
-Email drafts can be opened in Gmail or the default mail client; sending marks the lead as CONTACTED and records an activity entry
-Architecture
-REST + Bearer JWT
-research profile
-score + signals
-Next.js frontend
-FastAPI backend
-PostgreSQL
-Orchestrator
-Research Agent
-Qualification Agent
-Email Agent
-Google Gemini API
-Agents
-Agent	Input	Output
-Research	Lead details, company website / domain	Company summary, industry, products, technology stack, pain points, buying signals, sources, confidence
-Qualification	Lead + research output	ICP score (0-100), classification (HIGH_FIT, MEDIUM_FIT, LOW_FIT), positive drivers, risk factors, reasoning
-Email	Lead + research + qualification	Initial email, follow-up (sent 3 days later), personalization rationale
+---
 
-Agents exchange validated Pydantic models rather than free-form text. Each agent's output is persisted with a timestamp so it can be displayed in the lead's history.
+## Live Deployments
 
-Qualification rubric
+| Component | Service URL |
+| :--- | :--- |
+| **Frontend Web App** | [nexus-sdr-frontend.onrender.com](https://nexus-sdr-frontend.onrender.com) |
+| **Backend API (FastAPI)** | [nexus-sdr-backend.onrender.com](https://nexus-sdr-backend.onrender.com) |
+| **Interactive API Docs (Swagger)** | [nexus-sdr-backend.onrender.com/docs](https://nexus-sdr-backend.onrender.com/docs) |
+| **GitHub Repository** | [github.com/Areeb455/nexus_ai_sdr](https://github.com/Areeb455/nexus_ai_sdr) |
 
-The score is based on four dimensions:
+> Services run on Render's free tier and spin down when idle. The first request after inactivity can take up to a minute.
 
-Role authority
-Industry fit
-Company scale
-Urgency and intent signals
-Tech stack
-Layer	Technology
-Frontend	Next.js (App Router), React, TypeScript, Tailwind CSS
-Backend	FastAPI, Python 3.11, SQLAlchemy, Pydantic v2, HTTPX
-Database	PostgreSQL (production), SQLite (local development)
-LLM	Google Gemini via the google-genai SDK
-Hosting	Render, deployed from main
-Getting started
-Prerequisites
-Python 3.10+
-Node.js 18+
-A Google Gemini API key
-Backend
-bash
+**Demo account:** `demo@nexus.ai` / `password123`
+
+---
+
+## Overview
+
+Nexus AI SDR helps a sales team discover prospects, understand and qualify them, and generate personalized outreach. Three specialized agents own research, qualification, and email generation. They pass structured data to one another, and every output is persisted so the full lifecycle of a lead can be reviewed from the dashboard.
+
+---
+
+## Key Platform Capabilities
+
+### 1. Multi-Agent Pipeline
+
+**Research Agent**
+
+- Gathers public information about the target company and its website.
+- Extracts products, business model, technology stack, and operational pain points.
+- Applies guardrails against generic or unsupported claims.
+
+**Qualification Agent**
+
+- Evaluates each prospect against an Ideal Customer Profile (ICP) rubric across four dimensions: *Role Authority*, *Industry Fit*, *Company Scale*, and *Urgency / Intent Signals*.
+- Produces an ICP score (0-100), a classification (`HIGH_FIT`, `MEDIUM_FIT`, `LOW_FIT`), positive drivers, and risk factors.
+
+**Email Agent**
+
+- Generates a two-touch outbound cadence: an introduction email and a follow-up sent three days later.
+- Personalizes each message using the lead's role, company context, and researched pain points.
+- Does not produce bracketed placeholders or generic templates.
+
+### 2. Autonomous Prospector
+
+Enter a company name or domain (for example `stripe.com` or `linear.app`) and the orchestrator will:
+
+1. Inspect the target's web presence.
+2. Identify likely decision-maker personas.
+3. Run commercial research.
+4. Compute the ICP qualification score.
+5. Draft the email cadence.
+
+### 3. Dashboard
+
+- Pipeline overview with lead counts, ICP breakdown, and outbound volume.
+- Searchable and filterable lead list.
+- Lead workspace showing research, qualification scorecard, email drafts, and activity history.
+- Company logos resolved automatically, with a text monogram fallback.
+- Email dispatch through Gmail (pre-filled in a new tab) or the default mail client (`mailto:`). Sending marks the lead as `CONTACTED` and records an activity entry.
+
+---
+
+## Architecture
+
+```
++-----------------------------------------------------------------------------------+
+|                                  Next.js Web UI                                   |
+|       (Pipeline Cockpit, Lead Workspace, Email Dispatch, Autonomous Prospector)   |
++-----------------------------------------+-----------------------------------------+
+                                          | REST API (Bearer JWT)
+                                          v
++-----------------------------------------------------------------------------------+
+|                              FastAPI Core Backend                                 |
+|         (Lead Engine, Multi-Agent Orchestrator, PostgreSQL Persistence)           |
++-----------------------------------------+-----------------------------------------+
+                                          |
+                                          v
+                     +-----------------------------------------+
+                     |         Multi-Agent Orchestrator        |
+                     +----+--------------------+----------+----+
+                          |                    |          |
+        +-----------------+                    |          +------------------+
+        v                                      v                             v
++------------------+                 +-------------------+          +------------------+
+|  Research Agent  |                 |Qualification Agent|          |   Email Agent    |
+|  (Web Telemetry, +---------------->+ (ICP Rubric 0-100,|--------->+ (Multi-Touch     |
+|   Tech Stack,    |  Intelligence   |  Drivers & Risks) | Context  |  Cadence & Copy) |
+|  Pain Points)    |     Handoff     |                   | Handoff  |                  |
++--------+---------+                 +---------+---------+          +--------+---------+
+         |                                     |                             |
+         +-------------------------------------+-----------------------------+
+                                               |
+                                               v
+                          +------------------------------------------+
+                          |               LLM Engine                 |
+                          |       Google Gemini (google-genai)       |
+                          +------------------------------------------+
+```
+
+### Agent Contracts
+
+| Agent | Input | Output |
+| :--- | :--- | :--- |
+| **Research** | Lead details, company website or domain | Summary, industry, products, technology stack, pain points, buying signals, sources, confidence |
+| **Qualification** | Lead + research output | ICP score, classification, positive drivers, risk factors, reasoning |
+| **Email** | Lead + research + qualification | Initial email, follow-up, personalization rationale |
+
+Agents exchange validated Pydantic models rather than free-form text, and each output is stored with a timestamp for the activity history.
+
+---
+
+## Technology Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | Next.js (App Router), React, TypeScript, Tailwind CSS, Framer Motion, Lucide Icons |
+| **Backend** | FastAPI, Python 3.11, SQLAlchemy ORM, Pydantic v2, HTTPX |
+| **Database** | PostgreSQL (production on Render), SQLite (local development) |
+| **AI** | Google Gemini Flash models via the `google-genai` SDK |
+| **Deployment** | Render, continuous deployment from GitHub `main` |
+
+---
+
+## REST API
+
+All endpoints are prefixed with `/api/v1` and require a Bearer token, except registration and login. Full schemas are available in the Swagger docs.
+
+### Leads
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/leads` | Create a lead manually |
+| `GET` | `/leads` | List leads; search and filter by status and ICP tier |
+| `GET` | `/leads/{id}` | Full lead profile with latest research, qualification, and email drafts |
+| `PATCH` | `/leads/{id}` | Update lead status or contact details |
+| `POST` | `/leads/autonomous-hunt` | Ingest a domain, run all agents, return the enriched lead |
+| `GET` | `/leads/metrics` | Pipeline statistics |
+| `DELETE` | `/leads/dev/clear-all` | Purge all leads (testing only) |
+
+### Agent Execution
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/leads/{id}/pipeline` | Run the full multi-agent workflow |
+| `POST` | `/leads/{id}/research` | Run the Research Agent |
+| `POST` | `/leads/{id}/qualify` | Run the Qualification Agent |
+| `POST` | `/leads/{id}/email` | Run the Email Agent |
+
+### System
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/settings/system-status` | Service health and active AI provider |
+
+---
+
+## Lead Lifecycle
+
+`NEW` → `RESEARCHED` → `QUALIFIED` → `CONTACTED`
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Python 3.10 or 3.11
+- Node.js 18+ and npm
+- A Google Gemini API key
+
+### Backend
+
+```bash
 cd backend
+
+# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-cp .env.example .env            # then fill in the values below
+
+# Configure environment variables (see below)
+cp .env.example .env
+
+# Seed the database with the demo account and sample leads
 python scripts/seed_data.py
-uvicorn app.main:app --reload
 
-The API serves interactive documentation at /docs.
+# Start the API server
+uvicorn app.main:app --reload --port 8000
+```
 
-Frontend
-bash
+Interactive API docs are served at `/docs` on the running backend.
+
+### Frontend
+
+```bash
 cd frontend
+
+# Install dependencies
 npm install
-cp .env.example .env.local      # then fill in the values below
+
+# Start the development server
 npm run dev
-Environment variables
+```
 
-Backend (backend/.env):
+### Environment Variables
 
-Variable	Description
-GEMINI_API_KEY	Gemini API key (required)
-DATABASE_URL	Database connection string. Defaults to a local SQLite file if unset
-SECRET_KEY	Secret used to sign JWTs
+**Backend** (`backend/.env`)
 
-Frontend (frontend/.env.local):
+| Variable | Description |
+| :--- | :--- |
+| `GEMINI_API_KEY` | Gemini API key (required) |
+| `DATABASE_URL` | Database connection string; defaults to local SQLite if unset |
+| `SECRET_KEY` | Secret used to sign JWTs |
 
-Variable	Description
-NEXT_PUBLIC_API_URL	Base URL of the backend API
+**Frontend** (`frontend/.env.local`)
 
-Never commit .env files. Only .env.example files belong in the repository.
+| Variable | Description |
+| :--- | :--- |
+| `NEXT_PUBLIC_API_URL` | Base URL of the backend API |
 
-API overview
+Never commit `.env` files. Only `.env.example` belongs in the repository.
 
-All endpoints are prefixed with /api/v1 and require a Bearer token except registration and login. Full request and response schemas are available in the Swagger docs.
+---
 
-Leads
-Method	Endpoint	Description
-POST	/leads	Create a lead
-GET	/leads	List leads; supports search and filters by status and ICP tier
-GET	/leads/{id}	Lead detail with latest research, qualification and email drafts
-PATCH	/leads/{id}	Update lead details or status
-POST	/leads/autonomous-hunt	Create a lead from a company name or domain and run the full pipeline
-GET	/leads/metrics	Pipeline statistics
-Agents
-Method	Endpoint	Description
-POST	/leads/{id}/research	Run the Research Agent
-POST	/leads/{id}/qualify	Run the Qualification Agent
-POST	/leads/{id}/email	Run the Email Agent
-POST	/leads/{id}/pipeline	Run all three agents in sequence
-System
-Method	Endpoint	Description
-GET	/settings/system-status	Service health and active LLM provider
-Lead lifecycle
+## Production Build Verification
 
-NEW → RESEARCHED → QUALIFIED → CONTACTED
+```bash
+cd frontend
+npm run build
+```
 
-Project structure
-backend/
-  app/
-    api/          Route handlers
-    agents/       Research, qualification and email agents, orchestrator
-    models/       Database models
-    schemas/      Pydantic request/response models
-  scripts/        Seed data
-frontend/
-  app/            Next.js routes and components
-Assumptions and limitations
-Research relies on publicly available information. Companies with little public presence produce lower-confidence results.
-SQLite is used for local development only; PostgreSQL is the intended production database.
-LLM output is validated against schemas, but content quality depends on the underlying model and should be reviewed by a person before sending.
-License
+---
 
-MIT
+## Assumptions and Limitations
+
+- Research relies on publicly available information. Companies with little public presence yield lower-confidence results.
+- SQLite is for local development only; PostgreSQL is the intended production database.
+- Generated content should be reviewed by a person before it is sent.
+
+---
+
+## License
+
+MIT License.
