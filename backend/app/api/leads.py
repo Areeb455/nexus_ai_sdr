@@ -41,6 +41,13 @@ async def autonomous_hunt(
     from app.services.hunter_service import hunter_service
 
     query = req.query.strip()
+    words = query.split()
+    if len(words) > 4 and "." not in query:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"'{query[:40]}...' does not appear to be a company name or website domain. Please enter a real company (e.g. Stripe, Linear, Figma, Datadog) or website URL (e.g. stripe.com)."
+        )
+
     website_text = ""
     if "." in query or query.startswith("http"):
         website_text = await research_agent._fetch_website_text(query)
@@ -87,6 +94,7 @@ Respond ONLY with a valid JSON object matching:
 
     domain_part = query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com"
     clean_website = extracted.get("website") or (f"https://{domain_part}")
+    clean_company = domain_part.split(".")[0].capitalize()
     
     # Priority: Hunter.io verified contact > Gemini extracted
     if hunter_intel and hunter_intel.get("best_contact"):
@@ -94,15 +102,17 @@ Respond ONLY with a valid JSON object matching:
         contact_name = bc["name"]
         role = bc["position"]
         contact_email = bc["email"]
-        company_name = hunter_intel.get("company_name") or extracted.get("company_name", domain_part.split(".")[0].capitalize())
+        company_name = hunter_intel.get("company_name") or extracted.get("company_name", clean_company)
         notes = extracted.get("notes", "") + f" [Verified via Hunter.io: {bc['confidence']}% confidence]"
     else:
-        contact_name = extracted.get("contact_name", "Alex Mercer")
-        role = extracted.get("role", "VP of Revenue Operations")
-        email_user = contact_name.lower().replace(" ", ".")
+        contact_name = extracted.get("contact_name")
+        if not contact_name or contact_name == "Alex Mercer":
+            contact_name = f"Head of Growth ({clean_company})"
+        role = extracted.get("role") or "VP of Revenue Operations"
+        email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
         contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
-        company_name = extracted.get("company_name", domain_part.split(".")[0].capitalize())
-        notes = extracted.get("notes", f"Autonomous lead discovered for {domain_part}.")
+        company_name = extracted.get("company_name", clean_company)
+        notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company}.")
 
     lead = Lead(
         user_id=current_user.id,

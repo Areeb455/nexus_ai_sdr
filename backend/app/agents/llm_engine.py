@@ -24,6 +24,29 @@ class LLMEngine:
         self._init_vertex_ai()
 
     def _init_vertex_ai(self):
+        # 1. First check GCP_SERVICE_ACCOUNT_JSON env var (ideal for cloud platforms like Render)
+        sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+        if sa_json:
+            try:
+                sa_info = json.loads(sa_json)
+                from google.oauth2 import service_account
+                from google import genai
+                creds = service_account.Credentials.from_service_account_info(
+                    sa_info,
+                    scopes=['https://www.googleapis.com/auth/cloud-platform']
+                )
+                self.vertex_client = genai.Client(
+                    vertexai=True,
+                    project=sa_info.get("project_id", settings.GCP_PROJECT_ID),
+                    location=settings.GCP_LOCATION,
+                    credentials=creds
+                )
+                logger.info("Vertex AI GenAI client initialized successfully via GCP_SERVICE_ACCOUNT_JSON env var.")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to initialize Vertex AI from GCP_SERVICE_ACCOUNT_JSON: {e}")
+
+        # 2. Check local file path
         cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS
         if not os.path.isabs(cred_path):
             potential_paths = [
@@ -40,13 +63,19 @@ class LLMEngine:
         if os.path.exists(cred_path):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred_path
             try:
+                from google.oauth2 import service_account
                 from google import genai
+                creds = service_account.Credentials.from_service_account_file(
+                    cred_path,
+                    scopes=['https://www.googleapis.com/auth/cloud-platform']
+                )
                 self.vertex_client = genai.Client(
                     vertexai=True,
                     project=settings.GCP_PROJECT_ID,
-                    location=settings.GCP_LOCATION
+                    location=settings.GCP_LOCATION,
+                    credentials=creds
                 )
-                logger.info("Vertex AI GenAI client initialized successfully with service account.")
+                logger.info("Vertex AI GenAI client initialized successfully with service account file.")
             except Exception as e:
                 logger.warning(f"Failed to initialize Vertex AI client: {e}")
 
