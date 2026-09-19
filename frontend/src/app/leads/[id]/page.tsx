@@ -142,17 +142,40 @@ export default function LeadDetailPage() {
     }
   };
 
-  const handleSendEmailNow = async () => {
+  const handleSendEmailNow = async (mode: "gmail" | "mailto" = "gmail") => {
     if (!lead?.latest_email) return;
     setSendingEmail(true);
     setError(null);
+
+    const emailOut = lead.latest_email;
+    const recipient = lead.contact_email || "";
+    
+    // Choose active draft (Touch 1 or Touch 2)
+    const currentSubject = activeEmailTab === "initial"
+      ? (emailOut.subject || `Inquiry for ${lead.company_name}`)
+      : (emailOut.follow_up_subject || `Quick follow-up re: ${lead.company_name}`);
+
+    const currentBody = activeEmailTab === "initial"
+      ? (emailOut.body || "")
+      : (emailOut.follow_up_body || emailOut.body || "");
+
+    // 1. Redirect to email client with drafted text pre-filled
+    if (mode === "gmail") {
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(currentSubject)}&body=${encodeURIComponent(currentBody)}`;
+      window.open(gmailUrl, "_blank", "noopener,noreferrer");
+    } else {
+      const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(currentSubject)}&body=${encodeURIComponent(currentBody)}`;
+      window.location.href = mailtoUrl;
+    }
+
+    // 2. Mark lead status as CONTACTED in pipeline and refresh
     try {
       await api.agents.sendEmail(leadId);
       setEmailSentSuccess(true);
       await fetchLeadData();
-      setTimeout(() => setEmailSentSuccess(false), 3000);
+      setTimeout(() => setEmailSentSuccess(false), 4000);
     } catch (err: any) {
-      setError(err.message || "Email delivery failed via dispatch API");
+      console.warn("Could not auto-advance status:", err);
     } finally {
       setSendingEmail(false);
     }
@@ -801,34 +824,39 @@ export default function LeadDetailPage() {
                   </div>
                 )}
 
-                {/* Direct Dispatch Button */}
-                <div className="pt-2">
+                {/* Direct Dispatch & Redirect Actions */}
+                <div className="pt-2 space-y-2">
                   <button
-                    onClick={handleSendEmailNow}
-                    disabled={sendingEmail || emailSentSuccess}
-                    className={`w-full py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      emailSentSuccess 
-                        ? "bg-emerald-950 border border-emerald-500/40 text-emerald-300"
-                        : "bg-white hover:bg-zinc-200 text-black font-semibold shadow-[0_0_15px_rgba(255,255,255,0.1)]"
-                    }`}
+                    onClick={() => handleSendEmailNow("gmail")}
+                    disabled={sendingEmail}
+                    className="w-full py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all bg-white hover:bg-zinc-200 text-black font-semibold shadow-[0_0_15px_rgba(255,255,255,0.12)] active:scale-[0.99] cursor-pointer"
                   >
-                    {sendingEmail ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Dispatching via Resend...</span>
-                      </>
-                    ) : emailSentSuccess ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Email Sent Successfully</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Send to {lead.contact_email || "Prospect"}</span>
-                      </>
-                    )}
+                    <Send className="w-3.5 h-3.5 text-black" />
+                    <span>Send to {lead.contact_email || "Prospect"} (Open Gmail)</span>
                   </button>
+
+                  <button
+                    onClick={() => handleSendEmailNow("mailto")}
+                    disabled={sendingEmail}
+                    className="w-full py-2 rounded-xl text-[11px] font-mono text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-white/[0.06] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Mail className="w-3 h-3 text-zinc-500" />
+                    <span>Or open in default mail app (Outlook / Apple Mail)</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {emailSentSuccess && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-center gap-2"
+                      >
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Opened in Composer with Drafted Text & Marked Contacted ✓</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             ) : (
