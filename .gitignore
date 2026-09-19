@@ -50,3 +50,8 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+ 
+# Service account secrets
+*service_account*.json
+gcp_sa.json
+credentials*.json
