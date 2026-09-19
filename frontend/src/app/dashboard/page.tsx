@@ -150,17 +150,27 @@ export default function DashboardPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400" />
-          <div className="flex-1">
-            <span className="font-semibold">Connection Warning:</span> {error}
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400" />
+            <div>
+              <span className="font-semibold">Session Required:</span> Please log in to view your live pipeline.
+            </div>
           </div>
-          <button
-            onClick={() => loadData(true)}
-            className="text-xs underline hover:text-white"
-          >
-            Retry
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition-all"
+            >
+              Sign In to Demo Account
+            </Link>
+            <button
+              onClick={() => loadData(true)}
+              className="text-xs text-slate-400 underline hover:text-white"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
