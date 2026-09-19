@@ -48,18 +48,19 @@ async def autonomous_hunt(
             detail=f"'{query[:40]}...' does not appear to be a company name or website domain. Please enter a real company (e.g. Stripe, Linear, Figma, Datadog) or website URL (e.g. stripe.com)."
         )
 
-    # 1. Multi-source live web search & verified metric extraction
-    web_intel = await web_search_service.search_company_intel(query)
-    live_facts = "\n".join(web_intel.get("real_facts", []))
-    verified_metrics = web_intel.get("verified_metrics", {})
-    metrics_str = ", ".join([f"{k.capitalize()}: {v}" for k, v in verified_metrics.items()]) if verified_metrics else "Undisclosed"
+    try:
+        # 1. Multi-source live web search & verified metric extraction
+        web_intel = await web_search_service.search_company_intel(query)
+        live_facts = "\n".join(web_intel.get("real_facts", []))
+        verified_metrics = web_intel.get("verified_metrics", {})
+        metrics_str = ", ".join([f"{k.capitalize()}: {v}" for k, v in verified_metrics.items()]) if verified_metrics else "Undisclosed"
 
-    # 2. Query Hunter.io for real verified executive intelligence
-    hunter_intel = await hunter_service.search_domain(query)
-    hunter_context = ""
-    if hunter_intel and hunter_intel.get("best_contact"):
-        bc = hunter_intel["best_contact"]
-        hunter_context = f"""
+        # 2. Query Hunter.io for real verified executive intelligence
+        hunter_intel = await hunter_service.search_domain(query)
+        hunter_context = ""
+        if hunter_intel and hunter_intel.get("best_contact"):
+            bc = hunter_intel["best_contact"]
+            hunter_context = f"""
 HUNTER.IO VERIFIED CORPORATE INTELLIGENCE:
 - Company: {hunter_intel.get('company_name')}
 - Verified Email Pattern: {hunter_intel.get('email_pattern')}
@@ -71,7 +72,7 @@ HUNTER.IO VERIFIED CORPORATE INTELLIGENCE:
 NOTE: Use this real verified executive and company profile as your primary target persona.
 """
 
-    prompt = f"""You are the Nexus Autonomous Lead Prospecting Agent.
+        prompt = f"""You are the Nexus Autonomous Lead Prospecting Agent.
 Target Company/Domain: {query}
 
 LIVE WEB RESEARCH & REAL FACTUAL SIGNALS:
@@ -99,50 +100,66 @@ Respond ONLY with a valid JSON object matching:
   "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation, citing real products and verified scale."
 }}"""
 
-    extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
+        extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
 
-    domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com")
-    clean_website = extracted.get("website") or (f"https://{domain_part}")
-    clean_company = web_intel.get("company_name") or domain_part.split(".")[0].capitalize()
-    
-    # Priority: Hunter.io verified contact > Gemini extracted
-    if hunter_intel and hunter_intel.get("best_contact"):
-        bc = hunter_intel["best_contact"]
-        contact_name = bc["name"]
-        role = bc["position"]
-        contact_email = bc["email"]
-        company_name = hunter_intel.get("company_name") or extracted.get("company_name", clean_company)
-        notes = extracted.get("notes", "") + f" [Verified via Hunter.io: {bc['confidence']}% confidence]"
-    else:
-        contact_name = extracted.get("contact_name") or f"Head of Operations ({clean_company})"
-        role = extracted.get("role") or "VP of Revenue Operations"
-        email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
-        contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
-        company_name = extracted.get("company_name", clean_company)
-        notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company} based on live web presence.")
+        domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com")
+        clean_website = extracted.get("website") or (f"https://{domain_part}")
+        clean_company = web_intel.get("company_name") or domain_part.split(".")[0].capitalize()
+        
+        # Priority: Hunter.io verified contact > Gemini extracted
+        if hunter_intel and hunter_intel.get("best_contact"):
+            bc = hunter_intel["best_contact"]
+            contact_name = bc["name"]
+            role = bc["position"]
+            contact_email = bc["email"]
+            company_name = hunter_intel.get("company_name") or extracted.get("company_name", clean_company)
 
-    lead = Lead(
-        user_id=current_user.id,
-        company_name=company_name,
-        contact_name=contact_name,
-        contact_email=contact_email,
-        role=role,
-        website=clean_website,
-        industry=extracted.get("industry", "B2B Technology"),
-        company_size=extracted.get("company_size") or verified_metrics.get("headcount", "100-500 employees"),
-        location=extracted.get("location") or verified_metrics.get("headquarters", "San Francisco, CA"),
-        notes=notes,
-        status=LeadStatus.NEW.value
-    )
-    db.add(lead)
-    db.commit()
-    db.refresh(lead)
+            # If Hunter gave generic fallback but LLM/Web found specific named executive/founder:
+            if (not contact_name or contact_name in ["Key Decision Maker", "Executive Leader"]) and extracted.get("contact_name") and extracted.get("contact_name") not in ["Key Decision Maker", "Executive Leader"]:
+                contact_name = extracted.get("contact_name")
+                if extracted.get("role"):
+                    role = extracted.get("role")
 
-    if req.auto_run_pipeline:
-        await orchestrator.run_full_pipeline(lead, db, user_id=current_user.id)
+            notes = extracted.get("notes", "") + f" [Verified via Hunter.io: {bc['confidence']}% confidence]"
+        else:
+            contact_name = extracted.get("contact_name") or f"Head of Operations ({clean_company})"
+            role = extracted.get("role") or "VP of Revenue Operations"
+            email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
+            contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+            company_name = extracted.get("company_name", clean_company)
+            notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company} based on live web presence.")
+
+        lead = Lead(
+            user_id=current_user.id,
+            company_name=company_name,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            role=role,
+            website=clean_website,
+            industry=extracted.get("industry", "B2B Technology"),
+            company_size=extracted.get("company_size") or verified_metrics.get("headcount", "100-500 employees"),
+            location=extracted.get("location") or verified_metrics.get("headquarters", "San Francisco, CA"),
+            notes=notes,
+            status=LeadStatus.NEW.value
+        )
+        db.add(lead)
+        db.commit()
         db.refresh(lead)
 
-    return _build_lead_response(lead)
+        if req.auto_run_pipeline:
+            await orchestrator.run_full_pipeline(lead, db, user_id=current_user.id)
+            db.refresh(lead)
+
+        return _build_lead_response(lead)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logging.getLogger(__name__).error(f"[AutonomousHunt] Execution error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Autonomous hunt error: {str(e)}"
+        )
 
 @router.delete("/dev/clear-all")
 def clear_all_leads(

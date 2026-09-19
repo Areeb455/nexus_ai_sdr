@@ -73,9 +73,11 @@ class HunterService:
 
                 contact_info = None
                 if best_contact:
-                    first = best_contact.get("first_name", "")
-                    last = best_contact.get("last_name", "")
-                    full_name = f"{first} {last}".strip() or "Key Decision Maker"
+                    first = (best_contact.get("first_name") or "").strip()
+                    last = (best_contact.get("last_name") or "").strip()
+                    full_name = f"{first} {last}".strip()
+                    if not full_name or full_name.lower() in ["none none", "none"]:
+                        full_name = "Key Decision Maker"
                     contact_info = {
                         "name": full_name,
                         "email": best_contact.get("value"),
@@ -86,6 +88,20 @@ class HunterService:
                         "verification_status": best_contact.get("verification", {}).get("status", "valid")
                     }
 
+                clean_all_contacts = []
+                for e in emails[:5]:
+                    c_first = (e.get("first_name") or "").strip()
+                    c_last = (e.get("last_name") or "").strip()
+                    c_name = f"{c_first} {c_last}".strip()
+                    if not c_name or c_name.lower() in ["none none", "none"]:
+                        c_name = "Executive Leader"
+                    clean_all_contacts.append({
+                        "name": c_name,
+                        "position": e.get("position") or "Team Member",
+                        "email": e.get("value"),
+                        "confidence": e.get("confidence", 75)
+                    })
+
                 return {
                     "source": "Hunter.io Verified Intelligence",
                     "company_name": organization,
@@ -93,15 +109,7 @@ class HunterService:
                     "email_pattern": pattern,
                     "total_emails_found": len(emails),
                     "best_contact": contact_info,
-                    "all_contacts": [
-                        {
-                            "name": f"{e.get('first_name', '')} {e.get('last_name', '')}".strip(),
-                            "position": e.get("position"),
-                            "email": e.get("value"),
-                            "confidence": e.get("confidence")
-                        }
-                        for e in emails[:5]
-                    ]
+                    "all_contacts": clean_all_contacts
                 }
 
         except Exception as e:

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] | str = [
+        "https://nexus-sdr-frontend.onrender.com",
+        "https://nexus-sdr-backend.onrender.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
@@ -33,9 +35,28 @@ class Settings(BaseSettings):
     ]
 
     def get_cors_origins(self) -> List[str]:
+        base_origins = [
+            "https://nexus-sdr-frontend.onrender.com",
+            "https://nexus-sdr-backend.onrender.com",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
         if isinstance(self.CORS_ORIGINS, str):
-            return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-        return self.CORS_ORIGINS
+            if self.CORS_ORIGINS.strip() == "*":
+                return base_origins
+            parsed = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+            for b in base_origins:
+                if b not in parsed:
+                    parsed.append(b)
+            return parsed
+        
+        origins = list(self.CORS_ORIGINS)
+        for b in base_origins:
+            if b not in origins:
+                origins.append(b)
+        return origins
     
     model_config = SettingsConfigDict(
         env_file=".env",
