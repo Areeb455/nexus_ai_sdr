@@ -19,7 +19,10 @@ class Settings(BaseSettings):
     # LLM Settings
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    DEFAULT_AI_PROVIDER: str = "heuristic"  # Options: 'gemini', 'openai', 'heuristic'
+    GOOGLE_APPLICATION_CREDENTIALS: str = "gemini_friend_dedicated_key.json"
+    GCP_PROJECT_ID: str = "kiitfest-backend-01455"
+    GCP_LOCATION: str = "global"
+    DEFAULT_AI_PROVIDER: str = "vertex"  # Options: 'vertex', 'gemini', 'openai', 'heuristic'
     
     # CORS
     CORS_ORIGINS: List[str] | str = [

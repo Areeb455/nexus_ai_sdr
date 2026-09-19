@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Dict, Any, Union
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 class ResearchAgentOutput(BaseModel):
     summary: str = Field(..., description="High-level executive summary of company and business model")
@@ -12,6 +12,15 @@ class ResearchAgentOutput(BaseModel):
     sources: List[str] = Field(default_factory=list, description="Web domains and information sources researched")
     confidence_score: float = Field(0.85, description="Confidence score from 0.0 to 1.0")
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("company_overview", "summary", mode="before")
+    @classmethod
+    def coerce_to_str(cls, v):
+        if isinstance(v, dict):
+            return " ".join(f"{k.capitalize()}: {val}" for k, val in v.items())
+        elif isinstance(v, list):
+            return " ".join(str(item) for item in v)
+        return str(v) if v is not None else ""
 
 class QualificationAgentOutput(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Overall ICP fit score between 0 and 100")
@@ -25,6 +34,13 @@ class QualificationAgentOutput(BaseModel):
     )
     recommendation: Optional[str] = Field(None, description="Recommended next action (e.g. PRIORITY_OUTREACH, NURTURE, DISQUALIFY)")
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("reasoning", mode="before")
+    @classmethod
+    def coerce_reasoning(cls, v):
+        if isinstance(v, dict):
+            return " ".join(f"{k.capitalize()}: {val}" for k, val in v.items())
+        return str(v) if v is not None else ""
 
 class EmailAgentOutput(BaseModel):
     subject: str = Field(..., description="Compelling, personalized email subject line")

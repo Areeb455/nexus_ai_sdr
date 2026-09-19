@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from typing import Dict, Any, Optional
 from app.core.config import settings
@@ -9,27 +10,51 @@ logger = logging.getLogger(__name__)
 class LLMEngine:
     """
     Unified LLM provider interface supporting:
-    1. Google Gemini API (gemini-1.5-flash)
-    2. OpenAI API (gpt-4o-mini)
-    3. Context-aware intelligent heuristic fallback engine
+    1. Google Cloud Vertex AI (gemini-2.5-flash) via Service Account
+    2. Google AI Studio Gemini API (gemini-2.5-flash / gemini-1.5-flash)
+    3. OpenAI API (gpt-4o-mini)
+    4. Context-aware intelligent heuristic fallback engine
     """
 
     def __init__(self):
         self.provider = settings.DEFAULT_AI_PROVIDER
         self.gemini_key = settings.GEMINI_API_KEY
         self.openai_key = settings.OPENAI_API_KEY
+        self.vertex_client = None
+        self._init_vertex_ai()
+
+    def _init_vertex_ai(self):
+        cred_path = settings.GOOGLE_APPLICATION_CREDENTIALS
+        if not os.path.isabs(cred_path):
+            potential_paths = [
+                os.path.join(os.getcwd(), cred_path),
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), cred_path),
+                os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", cred_path),
+                cred_path
+            ]
+            for p in potential_paths:
+                if os.path.exists(p):
+                    cred_path = p
+                    break
         
-        # Determine actual active provider
-        if self.gemini_key:
-            self.provider = "gemini"
-        elif self.openai_key:
-            self.provider = "openai"
-        else:
-            self.provider = "heuristic"
+        if os.path.exists(cred_path):
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred_path
+            try:
+                from google import genai
+                self.vertex_client = genai.Client(
+                    vertexai=True,
+                    project=settings.GCP_PROJECT_ID,
+                    location=settings.GCP_LOCATION
+                )
+                logger.info("Vertex AI GenAI client initialized successfully with service account.")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Vertex AI client: {e}")
 
     def get_active_provider(self) -> str:
+        if self.vertex_client:
+            return "Google Cloud Vertex AI (gemini-2.5-flash via Service Account)"
         if self.gemini_key:
-            return "Google Gemini (gemini-3.6-flash / 3.5-flash)"
+            return "Google Gemini AI Studio (gemini-2.5-flash)"
         if self.openai_key:
             return "OpenAI (gpt-4o-mini)"
         return "Nexus Heuristic AI Engine (Dynamic Local Analysis)"
@@ -38,12 +63,28 @@ class LLMEngine:
         """
         Generate structured JSON from LLM or fallback engine.
         """
-        # 1. Try Gemini if configured
+        # 1. Try Vertex AI with service account credentials
+        if self.vertex_client:
+            try:
+                full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with a valid JSON object. No Markdown code blocks, no explanation text."
+                response = self.vertex_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=full_prompt
+                )
+                if response and response.text:
+                    cleaned_text = self._clean_json_str(response.text)
+                    parsed = json.loads(cleaned_text)
+                    if isinstance(parsed, dict) and len(parsed) > 0:
+                        return parsed
+            except Exception as e:
+                logger.warning(f"Vertex AI invocation failed: {e}. Falling back to alternative providers.")
+
+        # 2. Try Google AI Studio Gemini API if configured
         if self.gemini_key:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.gemini_key)
-                for model_choice in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-1.5-flash"]:
+                for model_choice in ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-flash-latest"]:
                     try:
                         model = genai.GenerativeModel(model_choice)
                         full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with valid JSON."
@@ -58,7 +99,7 @@ class LLMEngine:
             except Exception as e:
                 logger.warning(f"Gemini API invocation failed: {e}. Falling back to OpenAI or Heuristics.")
 
-        # 2. Try OpenAI if configured
+        # 3. Try OpenAI if configured
         if self.openai_key:
             try:
                 from openai import AsyncOpenAI
@@ -77,7 +118,7 @@ class LLMEngine:
             except Exception as e:
                 logger.warning(f"OpenAI API invocation failed: {e}. Falling back to Heuristic Engine.")
 
-        # 3. Dynamic context-aware heuristic generation
+        # 4. Dynamic context-aware heuristic generation
         return self._heuristic_fallback(system_prompt, user_prompt)
 
     def _clean_json_str(self, text: str) -> str:
@@ -96,7 +137,6 @@ class LLMEngine:
         Intelligent context-aware engine that extracts company/role/industry context
         from the prompt and produces realistic structured intelligence.
         """
-        # Determine agent type from prompt
         if "Research Agent" in system_prompt or "research" in system_prompt.lower():
             return self._heuristic_research(user_prompt)
         elif "Qualification Agent" in system_prompt or "qualify" in system_prompt.lower():
@@ -119,43 +159,48 @@ class LLMEngine:
         website = self._extract_field(prompt, "Website", f"https://www.{company.lower().replace(' ', '')}.com")
         size = self._extract_field(prompt, "Size", "50-200 employees")
 
-        is_tech_saas = any(k in f"{industry} {company}".lower() for k in ["tech", "saas", "software", "cloud", "data", "ai", "fintech"])
-        
-        pain_points = []
-        tech_stack = []
-        growth_signals = []
+        competitors_map = {
+            "fintech": ["Stripe", "Adyen", "Checkout.com", "Square", "Plaid"],
+            "cybersecurity": ["CrowdStrike", "Palo Alto Networks", "SentinelOne", "Fortinet", "Zscaler"],
+            "e-commerce": ["Shopify", "BigCommerce", "WooCommerce", "Magento", "Salesforce Commerce"],
+            "saas": ["HubSpot", "Salesforce", "ZoomInfo", "Apollo.io", "Gong.io"],
+            "healthcare": ["Epic Systems", "Cerner", "Athenahealth", "Veeva Systems"],
+            "logistics": ["Flexport", "Project44", "FourKites", "Convoy", "Samsara"],
+            "default": ["Apex Solutions", "Vanguard Systems", "Meridian Tech", "Horizon Global"]
+        }
 
-        if is_tech_saas:
-            pain_points = [
-                "High SDR turnover leading to inconsistent pipeline generation and missed outbound quotas",
-                "Manual lead enrichment processes causing 4-6 hour latency between signup and sales touch",
-                "Sub-optimal personalization in cold cadences resulting in declining 1.8% reply rates",
-                "Difficulty scaling outbound pipeline without disproportionately bloating sales team headcount"
-            ]
-            tech_stack = ["Salesforce CRM", "HubSpot", "Outreach.io", "Segment", "PostgreSQL", "AWS / Snowflake"]
-            growth_signals = [
-                f"{company} expanded headcount by 28% year-over-year in product and customer-facing roles",
-                f"Active hiring for sales leadership and revenue operations indicates aggressive go-to-market scaling",
-                f"Recent press highlights expansion into enterprise mid-market offerings"
-            ]
-        else:
-            pain_points = [
-                "Legacy manual customer communication workflows slowing down response turnaround times",
-                "Disconnected systems between marketing inquiries and sales rep follow-ups",
-                "Limited visibility into lead qualification criteria across the commercial department"
-            ]
-            tech_stack = ["Microsoft 365", "Zendesk", "Google Workspace", "Custom internal ERP"]
-            growth_signals = [
-                f"{company} maintaining stable regional operations with localized expansion initiatives",
-                f"Digital modernization initiatives announced in recent corporate updates"
-            ]
+        ind_key = "default"
+        for k in competitors_map:
+            if k in industry.lower():
+                ind_key = k
+                break
+
+        competitors = competitors_map[ind_key]
+        if company in competitors:
+            competitors = [c for c in competitors if c != company]
+
+        tech_stack = ["FastAPI", "Next.js", "PostgreSQL", "AWS / Google Cloud", "Stripe API", "Docker"]
+        growth_signals = [
+            f"Active SDR hiring velocity in {industry} vertical",
+            f"Recent infrastructure scaling to address customer expansion",
+            f"Expanding leadership footprint under {role}"
+        ]
 
         return {
-            "summary": f"{company} is an active commercial organization in the {industry} space with an estimated size of {size}. Key decision-making around revenue and operations is spearheaded by roles like {role}.",
-            "company_overview": f"Operating in the {industry} sector, {company} delivers solutions focused on operational efficiency and market expansion. Their current commercial footprint requires scalable outbound sales and operational enablement.",
-            "target_pain_points": pain_points,
-            "key_decision_makers": [
-                {"name": contact, "role": role, "relevance": "Primary decision maker / budget stakeholder for sales enablement and pipeline growth"},
+            "company_name": company,
+            "industry": industry,
+            "estimated_size": size,
+            "summary": f"{company} is an established organization in the {industry} sector. Led strategically across revenue and operations, they are currently modernizing their outbound sales execution, pipeline acceleration, and automated lead qualification workflows.",
+            "key_competitors": competitors[:4],
+            "pain_points": [
+                f"High SDR manual time expenditure researching accounts across {industry}",
+                "Inconsistent lead qualification scoring leading to lower sales executive conversion",
+                "Sub-optimal outbound email response rates due to generic templated outreach",
+                "Difficulty scaling outbound pipeline without linearly adding SDR headcount"
+            ],
+            "target_buyers": [
+                {"name": f"VP / Head of {role.split()[-1]}", "role": role, "relevance": f"Directly owns team efficiency, SDR quotas, and pipeline velocity at {company}"},
+                {"name": "Chief Revenue Officer / CEO", "role": "Executive Sponsor", "relevance": "Drives bottom-line revenue efficiency and outbound ROI"},
                 {"name": "RevOps & Sales Ops Leads", "role": "Operations Stakeholders", "relevance": "Key influencers on tooling integration and team workflows"}
             ],
             "technology_stack": tech_stack,
@@ -174,14 +219,11 @@ class LLMEngine:
         industry = self._extract_field(prompt, "Industry", "Technology")
         size = self._extract_field(prompt, "Size", "50-200")
 
-        # Evaluate against ICP Criteria
-        # Target ICP: B2B SaaS/Tech/Fintech, Decision Makers (VP, Head, Director, C-level, Founder), Size 20-1000
         score = 50
         fit_category = "MEDIUM_FIT"
         positive_signals = []
         negative_signals = []
 
-        # Role Evaluation
         role_lower = role.lower()
         role_score = 15
         if any(r in role_lower for r in ["vp", "vice president", "head", "chief", "cco", "cro", "director", "founder", "ceo"]):
@@ -197,7 +239,6 @@ class LLMEngine:
             role_score = 10
             negative_signals.append(f"Low buying authority: '{role}' may not possess purchase sign-off for enterprise SDR software")
 
-        # Industry Evaluation
         ind_lower = industry.lower()
         ind_score = 15
         if any(i in ind_lower for i in ["saas", "software", "tech", "cloud", "fintech", "ai", "data"]):
@@ -213,7 +254,6 @@ class LLMEngine:
             ind_score = 10
             negative_signals.append(f"Non-core vertical: {industry} traditionally relies on offline/relationship selling")
 
-        # Size Evaluation
         size_score = 15
         if any(s in size.lower() for s in ["50", "100", "200", "500", "scale", "mid"]):
             score += 10
@@ -228,7 +268,6 @@ class LLMEngine:
             size_score = 5
             negative_signals.append(f"Sub-scale team size ({size}): Inadequate outbound volume to justify dedicated AI SDR investment")
 
-        # Clamp score between 10 and 96
         score = max(12, min(96, score))
 
         if score >= 75:
