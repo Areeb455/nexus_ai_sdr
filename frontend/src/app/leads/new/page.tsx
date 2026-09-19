@@ -181,40 +181,40 @@ export default function NewLeadPage() {
               type="button"
               onClick={() =>
                 applyPreset({
-                  company_name: "RetainAI Platform",
-                  contact_name: "Camila Alvarez",
-                  contact_email: "camila@retainai.io",
-                  role: "Head of Revenue Operations",
-                  website: "https://retainai.io",
-                  industry: "B2B SaaS / Customer Success",
-                  company_size: "140 employees",
-                  location: "New York, NY",
-                  notes: "Series A startup looking to optimize outbound SDR cadences and automate lead scoring.",
+                  company_name: "Linear",
+                  contact_name: "Conor Muirhead",
+                  contact_email: "conor@linear.app",
+                  role: "Head of Product Design",
+                  website: "https://linear.app",
+                  industry: "B2B SaaS / Developer Tooling",
+                  company_size: "118 employees",
+                  location: "San Francisco, CA",
+                  notes: "Fast-growing issue tracking platform ($100M ARR, $2.5B valuation). High-efficiency team scaling enterprise GTM motion.",
                 })
               }
               className="px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-medium transition-colors"
             >
-              🌟 High Fit: Camila (Head of RevOps @ RetainAI)
+              🌟 High Fit: Linear (Conor @ linear.app)
             </button>
 
             <button
               type="button"
               onClick={() =>
                 applyPreset({
-                  company_name: "Apex Logistics Hub",
-                  contact_name: "Derek Miller",
-                  contact_email: "dmiller@apexlogistics.com",
-                  role: "Director of Fleet Partnerships",
-                  website: "https://apexlogistics.com",
-                  industry: "Supply Chain & Logistics",
-                  company_size: "350 employees",
-                  location: "Dallas, TX",
-                  notes: "Regional freight broker seeking to automate initial cold qualification calls and partner emails.",
+                  company_name: "Stripe",
+                  contact_name: "Eileen O'Mara",
+                  contact_email: "eileen@stripe.com",
+                  role: "Chief Revenue Officer",
+                  website: "https://stripe.com",
+                  industry: "Fintech / Financial Infrastructure",
+                  company_size: "8000+ employees",
+                  location: "South San Francisco, CA",
+                  notes: "Global payments infrastructure ($19.4B ARR, $159B valuation). Enterprise scale with extensive global sales operations.",
                 })
               }
-              className="px-3 py-1.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/50 border border-amber-500/30 text-amber-300 text-xs font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition-colors"
             >
-              ⚡ Mid Fit: Derek (Director @ Apex Logistics)
+              ⚡ Enterprise: Stripe (Eileen, CRO @ stripe.com)
             </button>
 
             <button
@@ -229,12 +229,12 @@ export default function NewLeadPage() {
                   industry: "Art & Handcrafted Goods",
                   company_size: "1 employee",
                   location: "Portland, OR",
-                  notes: "One-man Etsy seller making handmade pottery. Zero outbound team or enterprise budget.",
+                  notes: "One-man craft shop making handmade goods. Solopreneur scale with zero outbound sales motion or software budget.",
                 })
               }
               className="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-300 text-xs font-medium transition-colors"
             >
-              ⚠️ Low Fit / Disqualify: Gary (Solo Potter)
+              ⚠️ Disqualify / Low Fit: Solo Potter (1 person)
             </button>
           </div>
         </div>

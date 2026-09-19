@@ -2,6 +2,9 @@ import os
 import logging
 import httpx
 from typing import Optional, Dict, Any, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

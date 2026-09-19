@@ -98,14 +98,16 @@ Identified Growth Signals: {growth_signals_str}
         except Exception as e:
             logger.error(f"[{self.name}] Qualification execution error: {e}")
             state.add_error(f"Qualification agent error: {str(e)}")
+            # Dynamically compute ICP score based on actual company role, industry, and size
+            heur = llm_engine._heuristic_qualification(user_prompt)
             fallback = QualificationAgentOutput(
-                score=55,
-                fit_category="MEDIUM_FIT",
-                reasoning="Standard baseline qualification assigned due to processing anomaly.",
-                positive_signals=["Valid business entity"],
-                negative_signals=["Insufficient enriched data"],
-                icp_fit_breakdown={"role_authority": 15, "industry_fit": 15, "company_size_fit": 15, "urgency_and_signals": 10},
-                recommendation="TARGETED_NURTURE"
+                score=heur["score"],
+                fit_category=heur["fit_category"],
+                reasoning=heur["reasoning"],
+                positive_signals=heur["positive_signals"],
+                negative_signals=heur["negative_signals"],
+                icp_fit_breakdown=heur["icp_fit_breakdown"],
+                recommendation=heur["recommendation"]
             )
             state.qualification = fallback
             state.current_step = "QUALIFIED"

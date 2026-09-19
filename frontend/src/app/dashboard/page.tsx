@@ -288,7 +288,7 @@ export default function DashboardPage() {
             <span className="text-xs text-slate-400">Pipeline Velocity</span>
           </div>
           <div className="mt-2 text-xs text-cyan-300/80 flex items-center gap-1">
-            <span>3.4x higher than standard manual SDR benchmarks</span>
+            <span>Live autonomous multi-agent pipeline conversion</span>
           </div>
         </div>
       </div>

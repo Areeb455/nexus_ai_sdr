@@ -42,12 +42,15 @@ class EmailAgent:
 Your goal is to write a compelling, hyper-personalized cold outreach email and a follow-up email from Nexus AI SDR.
 
 Guidelines:
+- CRITICAL: ZERO AI SLOP. Do NOT hallucinate fabricated statistics like 'SDRs spend 65% of their day' or '3.4x lift in meetings' or '42% reduction in CAC'.
+- Reference ONLY verified company facts, real products, and genuine operational scale found in the research context.
 - Personalize based on the lead's role, company context, and detected pain points.
 - Never use generic clichés like 'I hope this email finds you well' or 'Just checking in'.
 - Focus on the prospect's world: their growth, their SDR productivity bottlenecks, and the impact of autonomous AI SDR agents.
 - Keep the initial email under 125 words. Make the call-to-action (CTA) low-friction (e.g. 10-minute walkthrough).
 - Write a 3-day follow-up bump email (under 75 words) that adds new value.
 - Provide a clear 'personalization_rationale' explaining why you selected these specific hooks and angles.
+- Sign off professionally as 'Nexus AI Growth Team' or 'Nexus SDR Operations'. NEVER use placeholder personas like 'Alex Rivera'.
 
 Output JSON:
 {
@@ -84,27 +87,17 @@ Qualification Context:
             raw_output = await llm_engine.generate_json(system_prompt, user_prompt, schema_class=EmailAgentOutput)
 
             first_name = state.contact_name.split()[0] if state.contact_name else "there"
-            default_subj = f"Scaling {state.company_name}'s outbound pipeline without adding SDR headcount"
-            default_body = f"""Hi {first_name},
-
-Noticed {state.company_name}'s recent momentum in {state.industry or 'the market'} and was following your work leading {state.role or 'revenue growth'}.
-
-Most revenue leaders mention that SDRs spend up to 65% of their day manually researching accounts and drafting emails—resulting in slow lead turnaround and inconsistent pipeline.
-
-Nexus AI SDR solves this by deploying cooperating AI agents that autonomously conduct deep prospect research, ICP qualification, and personalized outreach before your reps even open their inbox.
-
-Open to a brief 10-minute walkthrough this Thursday or Friday to see how it works on your target account list?
-
-Best regards,
-Alex Rivera
-Nexus AI Growth Team"""
+            subject = raw_output.get("subject") or f"Partnership re: {state.company_name} outbound operations"
+            body = raw_output.get("body")
+            if not body:
+                raise ValueError(f"Email agent failed to generate authentic outreach for {state.contact_name}")
 
             email_output = EmailAgentOutput(
-                subject=raw_output.get("subject", default_subj),
-                body=raw_output.get("body", default_body),
-                follow_up_subject=raw_output.get("follow_up_subject", f"Quick bump re: outbound productivity at {state.company_name}"),
-                follow_up_body=raw_output.get("follow_up_body", f"Hi {first_name},\n\nWanted to quickly follow up on my note from earlier. If increasing outbound pipeline velocity is a priority for {state.company_name} this quarter, happy to share a brief 2-minute overview.\n\nBest,\nAlex"),
-                personalization_rationale=raw_output.get("personalization_rationale", f"Tailored to {first_name}'s role as {state.role} at {state.company_name}, highlighting specific SDR bottlenecks."),
+                subject=subject,
+                body=body,
+                follow_up_subject=raw_output.get("follow_up_subject", f"Following up: {subject}"),
+                follow_up_body=raw_output.get("follow_up_body", f"Hi {first_name},\n\nJust bumping my earlier note regarding {state.company_name}'s outbound pipeline motion. Would love to share a brief walkthrough if this is top of mind this quarter.\n\nBest,\nNexus Growth Team"),
+                personalization_rationale=raw_output.get("personalization_rationale", f"Directly tailored to {first_name} as {state.role} at {state.company_name} based on verified company signals."),
                 tone=raw_output.get("tone", "professional_concise")
             )
 
@@ -116,17 +109,6 @@ Nexus AI Growth Team"""
         except Exception as e:
             logger.error(f"[{self.name}] Email generation failed: {e}")
             state.add_error(f"Email agent error: {str(e)}")
-            first_name = state.contact_name.split()[0] if state.contact_name else "there"
-            fallback = EmailAgentOutput(
-                subject=f"Accelerating outbound pipeline at {state.company_name}",
-                body=f"Hi {first_name},\n\nReaching out because Nexus AI SDR helps companies like {state.company_name} automate prospect research and outreach.\n\nOpen to a quick 10-minute chat?\n\nBest,\nAlex",
-                follow_up_subject=f"Following up re: {state.company_name}",
-                follow_up_body=f"Hi {first_name},\n\nJust bumping this in case you had a moment to review.\n\nBest,\nAlex",
-                personalization_rationale="Fallback email generated with baseline personalization.",
-                tone="professional_concise"
-            )
-            state.email = fallback
-            state.current_step = "EMAIL_GENERATED"
-            return fallback
+            raise e
 
 email_agent = EmailAgent()

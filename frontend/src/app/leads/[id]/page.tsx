@@ -460,17 +460,24 @@ export default function LeadDetailPage() {
                   </div>
                 )}
 
-                {/* Growth Signals */}
+                {/* Growth Signals & Verified Market Metrics */}
                 {research.growth_signals && research.growth_signals.length > 0 && (
                   <div>
-                    <span className="font-semibold text-slate-300 block mb-1.5">Market Growth Signals</span>
-                    <div className="space-y-1">
-                      {research.growth_signals.map((sig, idx) => (
-                        <div key={idx} className="text-slate-400 flex items-center gap-1.5">
-                          <TrendingUp className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                          <span>{sig}</span>
-                        </div>
-                      ))}
+                    <span className="font-semibold text-slate-300 block mb-1.5">Verified Market Signals & Quantitative Metrics</span>
+                    <div className="space-y-1.5">
+                      {research.growth_signals.map((sig, idx) => {
+                        const isMetric = sig.includes("$") || sig.includes("ARR") || sig.includes("Valuation") || sig.includes("employees") || sig.includes("funding") || sig.includes("Registry");
+                        return (
+                          <div key={idx} className={`p-2.5 rounded-lg border flex items-start gap-2.5 text-xs ${
+                            isMetric 
+                              ? "bg-cyan-950/20 border-cyan-500/30 text-cyan-200" 
+                              : "bg-slate-900/40 border-white/5 text-slate-400"
+                          }`}>
+                            <TrendingUp className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isMetric ? "text-cyan-400" : "text-slate-500"}`} />
+                            <span className="leading-relaxed">{sig}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

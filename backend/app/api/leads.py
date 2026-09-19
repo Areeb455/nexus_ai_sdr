@@ -36,9 +36,9 @@ async def autonomous_hunt(
     5. Returns fully enriched lead ready for sales review.
     """
     from app.agents.llm_engine import llm_engine
-    from app.agents.research_agent import research_agent
     from app.agents.orchestrator import orchestrator
     from app.services.hunter_service import hunter_service
+    from app.services.web_search_service import web_search_service
 
     query = req.query.strip()
     words = query.split()
@@ -48,11 +48,13 @@ async def autonomous_hunt(
             detail=f"'{query[:40]}...' does not appear to be a company name or website domain. Please enter a real company (e.g. Stripe, Linear, Figma, Datadog) or website URL (e.g. stripe.com)."
         )
 
-    website_text = ""
-    if "." in query or query.startswith("http"):
-        website_text = await research_agent._fetch_website_text(query)
+    # 1. Multi-source live web search & verified metric extraction
+    web_intel = await web_search_service.search_company_intel(query)
+    live_facts = "\n".join(web_intel.get("real_facts", []))
+    verified_metrics = web_intel.get("verified_metrics", {})
+    metrics_str = ", ".join([f"{k.capitalize()}: {v}" for k, v in verified_metrics.items()]) if verified_metrics else "Undisclosed"
 
-    # 1. Query Hunter.io for real verified executive intelligence
+    # 2. Query Hunter.io for real verified executive intelligence
     hunter_intel = await hunter_service.search_domain(query)
     hunter_context = ""
     if hunter_intel and hunter_intel.get("best_contact"):
@@ -71,30 +73,37 @@ NOTE: Use this real verified executive and company profile as your primary targe
 
     prompt = f"""You are the Nexus Autonomous Lead Prospecting Agent.
 Target Company/Domain: {query}
-Live Website Snippet: {website_text[:2000] if website_text else 'None'}
+
+LIVE WEB RESEARCH & REAL FACTUAL SIGNALS:
+{live_facts if live_facts else 'Direct domain scrape only.'}
+
+VERIFIED FINANCIAL & SCALE METRICS:
+{metrics_str}
+
 {hunter_context}
 
 Extract real company intelligence and identify the single most relevant B2B buyer persona to prospect with Nexus AI SDR.
 If Hunter.io verified executive intelligence is provided above, utilize that real verified person and email format.
+CRITICAL: Do NOT invent fake numbers. Ground all fields in the real web signals.
 
 Respond ONLY with a valid JSON object matching:
 {{
   "company_name": "Official company name",
   "website": "Canonical URL (e.g. https://domain.com)",
   "industry": "Specific B2B segment (e.g. B2B SaaS / Developer Infrastructure / Fintech)",
-  "company_size": "Estimated employee count (e.g. 150-300 employees)",
+  "company_size": "Estimated employee count (prefer verified headcount if present, e.g. 118 employees)",
   "location": "Headquarters city and state/country (e.g. San Francisco, CA)",
   "contact_name": "Full name of executive buyer (prefer Hunter.io verified executive if present)",
   "role": "Executive title (e.g. Head of Engineering, VP of Sales, Head of RevOps)",
   "contact_email": "Professional email (prefer Hunter.io verified email)",
-  "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation, noting Hunter.io verification if present."
+  "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation, citing real products and verified scale."
 }}"""
 
     extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
 
-    domain_part = query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com"
+    domain_part = web_intel.get("domain") or (query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com")
     clean_website = extracted.get("website") or (f"https://{domain_part}")
-    clean_company = domain_part.split(".")[0].capitalize()
+    clean_company = web_intel.get("company_name") or domain_part.split(".")[0].capitalize()
     
     # Priority: Hunter.io verified contact > Gemini extracted
     if hunter_intel and hunter_intel.get("best_contact"):
@@ -105,14 +114,12 @@ Respond ONLY with a valid JSON object matching:
         company_name = hunter_intel.get("company_name") or extracted.get("company_name", clean_company)
         notes = extracted.get("notes", "") + f" [Verified via Hunter.io: {bc['confidence']}% confidence]"
     else:
-        contact_name = extracted.get("contact_name")
-        if not contact_name or contact_name == "Alex Mercer":
-            contact_name = f"Head of Growth ({clean_company})"
+        contact_name = extracted.get("contact_name") or f"Head of Operations ({clean_company})"
         role = extracted.get("role") or "VP of Revenue Operations"
         email_user = contact_name.lower().replace(" ", ".").replace("(", "").replace(")", "")
         contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
         company_name = extracted.get("company_name", clean_company)
-        notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company}.")
+        notes = extracted.get("notes", f"Autonomous lead discovered for {clean_company} based on live web presence.")
 
     lead = Lead(
         user_id=current_user.id,
@@ -122,8 +129,8 @@ Respond ONLY with a valid JSON object matching:
         role=role,
         website=clean_website,
         industry=extracted.get("industry", "B2B Technology"),
-        company_size=extracted.get("company_size", "100-500 employees"),
-        location=extracted.get("location", "San Francisco, CA"),
+        company_size=extracted.get("company_size") or verified_metrics.get("headcount", "100-500 employees"),
+        location=extracted.get("location") or verified_metrics.get("headquarters", "San Francisco, CA"),
         notes=notes,
         status=LeadStatus.NEW.value
     )
