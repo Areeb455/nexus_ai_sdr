@@ -239,6 +239,11 @@ export const api = {
         qualification?: QualificationData;
         email?: EmailData;
       }>(`/leads/${leadId}/pipeline`, { method: "POST" }),
+    sendEmail: (leadId: number | string) =>
+      request<Lead>(`/leads/${leadId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "CONTACTED" }),
+      }),
   },
   activity: {
     getLeadActivity: (leadId: number | string) =>

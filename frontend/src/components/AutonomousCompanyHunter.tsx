@@ -10,8 +10,6 @@ import {
   Bot, 
   CheckCircle2, 
   Building2, 
-  Target, 
-  Mail,
   Zap
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -30,18 +28,18 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
   const [error, setError] = useState<string | null>(null);
 
   const presets = [
-    { label: "Stripe", domain: "stripe.com", desc: "Fintech & Payments Infrastructure" },
-    { label: "Linear", domain: "linear.app", desc: "Issue Tracking & Dev Tooling" },
-    { label: "Figma", domain: "figma.com", desc: "Collaborative Design Platform" },
-    { label: "Datadog", domain: "datadoghq.com", desc: "Cloud Monitoring & Security" },
+    { label: "Stripe", domain: "stripe.com" },
+    { label: "Linear", domain: "linear.app" },
+    { label: "Figma", domain: "figma.com" },
+    { label: "Datadog", domain: "datadoghq.com" },
   ];
 
   const stepsList = [
-    { title: "Crawling Live Web Presence", desc: "Inspecting domain metadata, business model, and public signals" },
-    { title: "Synthesizing ICP Target Persona", desc: "Identifying executive buyer (VP Sales / RevOps) & corporate contact" },
-    { title: "Research Agent Deep-Dive", desc: "Extracting 3-4 sales pain points, tech stack, and growth signals" },
-    { title: "Qualification Agent Fit Scoring", desc: "Evaluating ICP score (0-100), categorization, and reasoning" },
-    { title: "Email Agent Outreach Crafting", desc: "Drafting personalized cold outreach, follow-up, and rationale" },
+    { title: "Crawling Live Web Presence", desc: "Extracting telemetry, verified public signals & business model" },
+    { title: "Synthesizing Buyer Persona", desc: "Identifying executive buyer & contact role" },
+    { title: "Research Agent Intelligence", desc: "Extracting verified operational bottlenecks & tech stack" },
+    { title: "Qualification Fit Assessment", desc: "Evaluating ICP rubric score (0-100) & recommendation" },
+    { title: "Email Studio Generation", desc: "Drafting personalized cold outreach & follow-up sequence" },
   ];
 
   const handleHunt = async (targetQuery?: string) => {
@@ -52,7 +50,6 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
     setError(null);
     setStep(0);
 
-    // Simulate step progress while LLM is generating
     const timer1 = setTimeout(() => setStep(1), 1500);
     const timer2 = setTimeout(() => setStep(2), 3500);
     const timer3 = setTimeout(() => setStep(3), 6000);
@@ -68,50 +65,49 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
 
       setTimeout(() => {
         if (onSuccess) onSuccess();
-        router.push(`/leads/${createdLead.id}`);
-      }, 800);
+        if (createdLead?.id) {
+          router.push(`/leads/${createdLead.id}`);
+        }
+      }, 700);
     } catch (err: any) {
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
       clearTimeout(timer4);
-      setError(err.message || "Autonomous prospecting encountered an error. Please verify the domain or try again.");
+      setError(err.message || "Prospecting failed. Please verify domain or try again.");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-[#10172a]/95 via-[#0b1120]/95 to-[#131b2e]/95 p-6 backdrop-blur-xl shadow-2xl shadow-indigo-950/40 ${inline ? "" : "mb-8"}`}>
-      {/* Decorative ambient glow */}
-      <div className="absolute -top-24 -right-24 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-
+    <div className={`relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl ${inline ? "" : "mb-8"}`}>
       <div className="relative z-10 space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.12] flex items-center justify-center text-white shadow-inner shrink-0">
+              <Zap className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                Autonomous AI SDR Company Prospector
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 uppercase tracking-wide">
-                  Live Agents
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                Autonomous AI Prospector
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-white/[0.08]">
+                  LIVE AGENTS
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
-                Input any target company or website. Cooperating agents crawl public intelligence, synthesize buyer personas, qualify ICP fit, and craft personalized outreach.
+              <p className="text-xs text-zinc-500 font-sans">
+                Input any target company. Agents crawl live intelligence, synthesize buyer personas, qualify ICP fit, and craft personalized emails.
               </p>
             </div>
           </div>
         </div>
 
         {/* Input Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Globe className="w-4 h-4 text-cyan-400" />
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+              <Globe className="w-4 h-4 text-zinc-400" />
             </div>
             <input
               type="text"
@@ -121,34 +117,34 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
                 if (e.key === "Enter" && !loading) handleHunt();
               }}
               disabled={loading}
-              placeholder="Enter company website or name (e.g. stripe.com, figma.com, linear.app, databricks.com)..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+              placeholder="Enter domain or company (e.g. stripe.com, figma.com, linear.app, thinklude.com)..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#060608] border border-white/[0.08] text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-white/30 transition-all"
             />
           </div>
 
           <button
             onClick={() => handleHunt()}
             disabled={loading || !query.trim()}
-            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-semibold tracking-tight shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Extracting & Prospecting...</span>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                <span>Prospecting...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-cyan-200" />
-                <span>Autonomous SDR Hunt</span>
-                <ArrowRight className="w-4 h-4" />
+                <Sparkles className="w-3.5 h-3.5 text-black" />
+                <span>Autonomous Hunt</span>
+                <ArrowRight className="w-3.5 h-3.5 text-black" />
               </>
             )}
           </button>
         </div>
 
         {/* 1-Click Quick Presets */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-xs text-slate-400 font-medium">Quick 1-Click Targets:</span>
+        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+          <span className="text-[11px] font-mono text-zinc-500">PRESETS:</span>
           {presets.map((preset) => (
             <button
               key={preset.domain}
@@ -157,24 +153,23 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
                 handleHunt(preset.domain);
               }}
               disabled={loading}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 hover:border-cyan-400/40 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-white/[0.08] hover:border-white/[0.18] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              {preset.label}
-              <span className="text-[10px] text-slate-500">({preset.domain})</span>
+              <span className="text-zinc-300 font-medium">{preset.label}</span>
+              <span className="text-zinc-600">({preset.domain})</span>
             </button>
           ))}
         </div>
 
-        {/* Live Multi-Agent Execution Progress Overlay */}
+        {/* Live Multi-Agent Execution Progress */}
         {loading && (
-          <div className="mt-4 p-4 rounded-xl bg-black/60 border border-indigo-500/30 space-y-3 animate-fadeIn">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-300 border-b border-white/10 pb-2">
-              <span className="flex items-center gap-2 text-indigo-400">
-                <Bot className="w-4 h-4 animate-pulse" />
-                Multi-Agent Cooperating Orchestrator in Action
+          <div className="mt-3 p-4 rounded-xl bg-black border border-white/[0.08] space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono text-zinc-300 border-b border-white/[0.06] pb-2">
+              <span className="flex items-center gap-2 text-white">
+                <Bot className="w-3.5 h-3.5 animate-pulse text-zinc-400" />
+                Multi-Agent Autonomous Orchestrator
               </span>
-              <span className="font-mono text-cyan-400">Step {Math.min(step + 1, 5)} of 5</span>
+              <span className="text-zinc-500">Step {Math.min(step + 1, 5)} / 5</span>
             </div>
 
             <div className="space-y-2">
@@ -186,24 +181,24 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
                     key={st.title}
                     className={`flex items-start gap-2.5 text-xs transition-opacity ${
                       isCompleted
-                        ? "text-slate-300"
+                        ? "text-zinc-300"
                         : isCurrent
                         ? "text-white font-medium"
-                        : "text-slate-500 opacity-60"
+                        : "text-zinc-600 opacity-50"
                     }`}
                   >
                     {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                     ) : isCurrent ? (
-                      <Loader2 className="w-4 h-4 text-cyan-400 animate-spin shrink-0 mt-0.5" />
+                      <Loader2 className="w-3.5 h-3.5 text-white animate-spin shrink-0 mt-0.5" />
                     ) : (
-                      <div className="w-4 h-4 rounded-full border border-slate-600 shrink-0 mt-0.5 flex items-center justify-center text-[9px] text-slate-500">
+                      <div className="w-3.5 h-3.5 rounded-full border border-zinc-700 shrink-0 mt-0.5 flex items-center justify-center text-[8px] font-mono text-zinc-600">
                         {i + 1}
                       </div>
                     )}
                     <div>
-                      <span className={isCurrent ? "text-cyan-300" : ""}>{st.title}</span>
-                      <p className="text-[11px] text-slate-400">{st.desc}</p>
+                      <span className={isCurrent ? "text-white font-mono" : "font-mono"}>{st.title}</span>
+                      <p className="text-[11px] text-zinc-500 font-sans">{st.desc}</p>
                     </div>
                   </div>
                 );
@@ -214,7 +209,7 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
 
         {/* Error message */}
         {error && (
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-red-500/30 text-xs font-mono text-red-400 flex items-center gap-2">
             <span>⚠️</span>
             <span>{error}</span>
           </div>
@@ -223,4 +218,3 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
     </div>
   );
 }
-

@@ -20,17 +20,12 @@ import {
   Copy, 
   Check, 
   AlertTriangle, 
-  XCircle, 
   Activity, 
   ExternalLink,
   ChevronRight,
   TrendingUp,
-  Cpu,
   RefreshCw,
-  Zap,
   Target,
-  FileText,
-  Flame,
   CheckCheck
 } from "lucide-react";
 import { 
@@ -47,55 +42,52 @@ const containerVariants: Variants = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08
+      staggerChildren: 0.06
     }
   }
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: 12 },
   show: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.35 }
+    transition: { duration: 0.3 }
   }
 };
 
 export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const leadId = params.id as string;
+  const leadId = Number(params?.id);
 
   const [lead, setLead] = useState<Lead | null>(null);
-  const [activities, setActivities] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [agentActionLoading, setAgentActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [activeEmailTab, setActiveEmailTab] = useState<"initial" | "followup">("initial");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSentSuccess, setEmailSentSuccess] = useState(false);
+  const [activities, setActivities] = useState<ActivityLogItem[]>([]);
 
   const fetchLeadData = async () => {
+    if (isNaN(leadId)) return;
     try {
-      const [l, act] = await Promise.all([
-        api.leads.get(leadId),
-        api.activity.getLeadActivity(leadId),
-      ]);
-      setLead(l);
-      setActivities(act);
+      const data = await api.leads.get(leadId);
+      setLead(data);
+      const acts = await api.activity.getLeadActivity(leadId);
+      setActivities(acts);
     } catch (err: any) {
-      setError(err.message || "Failed to load lead profile");
+      setError(err.message || "Failed to load lead details");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem("nexus_auth_token")) {
-      router.push("/login");
-      return;
-    }
     fetchLeadData();
-  }, [leadId, router]);
+  }, [leadId]);
 
   const handleRunResearch = async () => {
     setAgentActionLoading("RESEARCH");
@@ -104,7 +96,7 @@ export default function LeadDetailPage() {
       await api.agents.runResearch(leadId);
       await fetchLeadData();
     } catch (err: any) {
-      setError(err.message || "Research Agent encountered an issue.");
+      setError(err.message || "Research Agent failed to execute");
     } finally {
       setAgentActionLoading(null);
     }
@@ -117,7 +109,7 @@ export default function LeadDetailPage() {
       await api.agents.runQualify(leadId);
       await fetchLeadData();
     } catch (err: any) {
-      setError(err.message || "Qualification Agent encountered an issue.");
+      setError(err.message || "Qualification Agent failed to execute");
     } finally {
       setAgentActionLoading(null);
     }
@@ -130,7 +122,7 @@ export default function LeadDetailPage() {
       await api.agents.runEmail(leadId);
       await fetchLeadData();
     } catch (err: any) {
-      setError(err.message || "Email Agent encountered an issue.");
+      setError(err.message || "Email Generation Agent failed to execute");
     } finally {
       setAgentActionLoading(null);
     }
@@ -143,9 +135,25 @@ export default function LeadDetailPage() {
       await api.agents.runPipeline(leadId);
       await fetchLeadData();
     } catch (err: any) {
-      setError(err.message || "Multi-Agent Pipeline execution failed.");
+      setError(err.message || "Autonomous Agent Pipeline failed to execute");
     } finally {
       setAgentActionLoading(null);
+    }
+  };
+
+  const handleSendEmailNow = async () => {
+    if (!lead?.latest_email) return;
+    setSendingEmail(true);
+    setError(null);
+    try {
+      await api.agents.sendEmail(leadId);
+      setEmailSentSuccess(true);
+      await fetchLeadData();
+      setTimeout(() => setEmailSentSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || "Email delivery failed via dispatch API");
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -167,15 +175,11 @@ export default function LeadDetailPage() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-        <div className="relative">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 animate-spin flex items-center justify-center p-0.5">
-            <div className="w-full h-full bg-[#0b101d] rounded-[14px]"></div>
-          </div>
-          <Bot className="w-6 h-6 text-cyan-400 absolute inset-0 m-auto" />
+        <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.15] flex items-center justify-center animate-pulse">
+          <Bot className="w-4 h-4 text-zinc-300" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-semibold text-white">Synthesizing Agent Workspace</p>
-          <p className="text-xs text-slate-400 mt-0.5">Connecting live intelligence channels...</p>
+          <p className="text-xs font-mono uppercase tracking-widest text-zinc-400">Loading Pipeline State</p>
         </div>
       </div>
     );
@@ -183,13 +187,13 @@ export default function LeadDetailPage() {
 
   if (!lead) {
     return (
-      <div className="p-12 text-center rounded-2xl border border-white/10 bg-[#0d1424]/80 backdrop-blur-xl">
-        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-        <h2 className="text-lg font-bold text-white">Prospect Not Found</h2>
-        <p className="text-xs text-slate-400 mt-1">Lead ID #{leadId} does not exist in your pipeline.</p>
+      <div className="p-12 text-center rounded-2xl border border-white/[0.08] bg-zinc-950/80 backdrop-blur-xl">
+        <AlertTriangle className="w-8 h-8 text-zinc-400 mx-auto mb-3" />
+        <h2 className="text-base font-medium text-white">Prospect Not Found</h2>
+        <p className="text-xs text-zinc-500 mt-1 font-mono">Lead ID #{leadId} does not exist in pipeline.</p>
         <Link 
           href="/dashboard" 
-          className="inline-flex items-center gap-2 mt-5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
+          className="inline-flex items-center gap-2 mt-5 px-3 py-1.5 rounded-lg bg-white text-black text-xs font-medium hover:bg-zinc-200 transition-all"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Return to Dashboard
         </Link>
@@ -201,37 +205,34 @@ export default function LeadDetailPage() {
   const qual = lead.latest_qualification;
   const emailOut = lead.latest_email;
 
-  // Clean names to prevent AI slop placeholder
   const displayContactName = (lead.contact_name && !lead.contact_name.includes("[") && !lead.contact_name.toLowerCase().startsWith("head of operations"))
     ? lead.contact_name
     : (lead.company_name ? `${lead.company_name} Executive Team` : "Lead Decision Maker");
 
   return (
     <motion.div 
-      className="space-y-6 pb-12 max-w-[1600px] mx-auto"
+      className="space-y-6 pb-12 max-w-[1500px] mx-auto"
       variants={containerVariants}
       initial="hidden"
       animate="show"
     >
-      {/* 1. Header Toolbar */}
+      {/* 1. Header Navigation Toolbar */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors group"
+          className="inline-flex items-center gap-2 text-xs font-mono text-zinc-500 hover:text-zinc-200 transition-colors group"
         >
-          <span className="p-1 rounded-lg bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" />
-          </span>
-          Back to Pipeline
+          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+          <span>PIPELINE / #{lead.id}</span>
         </Link>
 
         {/* Lead Stage Pill Switcher */}
-        <div className="flex items-center gap-2.5 bg-slate-900/90 p-1.5 rounded-xl border border-white/10 shadow-inner">
-          <span className="text-[11px] font-medium text-slate-400 pl-2">Stage:</span>
+        <div className="flex items-center gap-2 bg-zinc-950 p-1 rounded-lg border border-white/[0.08]">
+          <span className="text-[10px] font-mono uppercase text-zinc-500 pl-2">STAGE:</span>
           <select
             value={lead.status}
             onChange={(e) => handleStatusChange(e.target.value)}
-            className="bg-[#0f172a] border border-white/10 text-xs font-semibold text-white rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+            className="bg-zinc-900 border border-white/[0.08] text-xs font-mono text-zinc-200 rounded-md px-2.5 py-1 focus:outline-none focus:border-white/30 cursor-pointer"
           >
             <option value="NEW">NEW LEAD</option>
             <option value="RESEARCHED">RESEARCHED</option>
@@ -249,83 +250,79 @@ export default function LeadDetailPage() {
       <AnimatePresence>
         {error && (
           <motion.div 
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between"
+            exit={{ opacity: 0, y: -6 }}
+            className="p-3.5 rounded-xl bg-zinc-950 border border-red-500/30 text-red-300 text-xs flex items-center justify-between font-mono"
           >
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
               <span>{error}</span>
             </div>
-            <button onClick={() => setError(null)} className="text-slate-400 hover:text-white text-sm">✕</button>
+            <button onClick={() => setError(null)} className="text-zinc-500 hover:text-white text-xs">✕</button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 2. Hero Prospect Command Card */}
+      {/* 2. Hero Prospect Command Card (Minimalist Obsidian Black) */}
       <motion.div 
         variants={itemVariants}
-        className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#111827]/90 via-[#0e1626]/90 to-[#131b2e]/90 p-6 backdrop-blur-2xl shadow-2xl shadow-black/40"
+        className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl"
       >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
-
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Company & Contact Profile */}
+          {/* Company & Contact Identity */}
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-cyan-400 p-[1.5px] shadow-lg shadow-indigo-500/20 shrink-0">
-              <div className="w-full h-full bg-[#0a0f1d] rounded-[14px] flex items-center justify-center text-lg font-black text-white">
-                {lead.company_name.slice(0, 2).toUpperCase()}
-              </div>
+            <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-white/[0.12] flex items-center justify-center font-mono font-bold text-white text-base shadow-inner shrink-0">
+              {lead.company_name.slice(0, 2).toUpperCase()}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl font-black text-white tracking-tight">
+                <h1 className="text-2xl font-bold tracking-tight text-white">
                   {lead.company_name}
                 </h1>
                 {qual && (
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                    qual.fit_category === "HIGH_FIT" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" :
-                    qual.fit_category === "MEDIUM_FIT" ? "bg-amber-500/15 text-amber-300 border-amber-500/30" :
-                    "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium border ${
+                    qual.fit_category === "HIGH_FIT" ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30" :
+                    qual.fit_category === "MEDIUM_FIT" ? "bg-amber-950/40 text-amber-400 border-amber-500/30" :
+                    "bg-zinc-900 text-zinc-400 border-white/[0.1]"
                   }`}>
                     <Target className="w-3 h-3" />
                     {qual.fit_category.replace("_", " ")} ({qual.score}/100)
                   </span>
                 )}
                 {lead.industry && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/5 border border-white/10 text-slate-300">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase bg-zinc-900 border border-white/[0.08] text-zinc-400">
                     {lead.industry}
                   </span>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-400">
-                <span className="font-semibold text-indigo-300 flex items-center gap-1">
-                  <User className="w-3 h-3 text-indigo-400" />
+              <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-zinc-400 font-sans">
+                <span className="font-medium text-zinc-300 flex items-center gap-1.5">
+                  <User className="w-3 h-3 text-zinc-500" />
                   {displayContactName} ({lead.role || "Executive Target"})
                 </span>
                 {lead.website && (
                   <>
-                    <span className="text-slate-600">•</span>
+                    <span className="text-zinc-700">•</span>
                     <a
                       href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-medium"
+                      className="inline-flex items-center gap-1 text-zinc-300 hover:text-white transition-colors"
                     >
-                      <Globe className="w-3 h-3" />
+                      <Globe className="w-3 h-3 text-zinc-500" />
                       {lead.website.replace("https://", "").replace("http://", "")}
-                      <ExternalLink className="w-2.5 h-2.5" />
+                      <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
                     </a>
                   </>
                 )}
                 {lead.contact_email && (
                   <>
-                    <span className="text-slate-600">•</span>
-                    <span className="inline-flex items-center gap-1 text-slate-300 font-mono text-[11px]">
-                      <Mail className="w-3 h-3 text-slate-400" />
+                    <span className="text-zinc-700">•</span>
+                    <span className="inline-flex items-center gap-1 font-mono text-zinc-400 text-[11px]">
+                      <Mail className="w-3 h-3 text-zinc-500" />
                       {lead.contact_email}
                     </span>
                   </>
@@ -337,91 +334,85 @@ export default function LeadDetailPage() {
           {/* Action Hub */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <motion.button
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleRunFullPipeline}
               disabled={Boolean(agentActionLoading)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 hover:from-indigo-600 hover:to-cyan-500 text-white text-xs font-bold shadow-xl shadow-indigo-500/25 flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-semibold tracking-tight shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
             >
               {agentActionLoading === "PIPELINE" ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-black" />
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-cyan-200" />
+                <Sparkles className="w-3.5 h-3.5 text-black" />
               )}
               Run Full Agent Pipeline
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={handleRunResearch}
               disabled={Boolean(agentActionLoading)}
-              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/[0.08] hover:border-white/[0.18] text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
             >
               {agentActionLoading === "RESEARCH" ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
+                <RefreshCw className="w-3 h-3 animate-spin text-zinc-400" />
               ) : (
-                <Bot className="w-3 h-3" />
+                <Bot className="w-3 h-3 text-zinc-400" />
               )}
               Research
-            </motion.button>
+            </button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={handleRunQualify}
               disabled={Boolean(agentActionLoading)}
-              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/[0.08] hover:border-white/[0.18] text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
             >
               {agentActionLoading === "QUALIFY" ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
+                <RefreshCw className="w-3 h-3 animate-spin text-zinc-400" />
               ) : (
-                <CheckCircle2 className="w-3 h-3" />
+                <CheckCircle2 className="w-3 h-3 text-zinc-400" />
               )}
               Qualify
-            </motion.button>
+            </button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={handleRunEmail}
               disabled={Boolean(agentActionLoading)}
-              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/[0.08] hover:border-white/[0.18] text-zinc-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
             >
               {agentActionLoading === "EMAIL" ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
+                <RefreshCw className="w-3 h-3 animate-spin text-zinc-400" />
               ) : (
-                <Send className="w-3 h-3" />
+                <Send className="w-3 h-3 text-zinc-400" />
               )}
-              Email
-            </motion.button>
+              Draft Email
+            </button>
           </div>
         </div>
 
-        {/* Dynamic Stepper Bar */}
-        <div className="mt-8 pt-6 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Minimalist Pipeline Progress Tracker */}
+        <div className="mt-8 pt-5 border-t border-white/[0.06] grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { step: 1, title: "Lead Ingested", active: true, color: "indigo" },
-            { step: 2, title: "Research Agent", active: Boolean(research), color: "cyan" },
-            { step: 3, title: "ICP Qualification", active: Boolean(qual), color: "emerald" },
-            { step: 4, title: "Email Campaign", active: Boolean(emailOut), color: "purple" },
+            { step: "01", title: "LEAD INGESTED", active: true },
+            { step: "02", title: "DEEP RESEARCH", active: Boolean(research) },
+            { step: "03", title: "ICP QUALIFICATION", active: Boolean(qual) },
+            { step: "04", title: "OUTREACH STUDIO", active: Boolean(emailOut) },
           ].map((s) => (
             <div 
               key={s.step} 
               className={`p-2.5 rounded-xl border flex items-center gap-3 transition-all ${
                 s.active 
-                  ? "bg-white/[0.04] border-white/15" 
-                  : "bg-transparent border-white/5 opacity-50"
+                  ? "bg-zinc-950 border-white/[0.1]" 
+                  : "bg-transparent border-white/[0.04] opacity-40"
               }`}
             >
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] font-bold ${
                 s.active 
-                  ? "bg-gradient-to-tr from-indigo-500 to-cyan-400 text-white shadow-md shadow-indigo-500/20" 
-                  : "bg-slate-800 text-slate-500"
+                  ? "bg-white text-black" 
+                  : "bg-zinc-900 text-zinc-600"
               }`}>
                 {s.active ? "✓" : s.step}
               </div>
-              <span className={`text-xs font-semibold ${s.active ? "text-white" : "text-slate-500"}`}>
+              <span className={`text-[11px] font-mono tracking-wider ${s.active ? "text-zinc-200" : "text-zinc-600"}`}>
                 {s.title}
               </span>
             </div>
@@ -438,36 +429,33 @@ export default function LeadDetailPage() {
           {/* Card 1: Research Agent Intelligence */}
           <motion.div 
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-[#0d1424]/85 backdrop-blur-xl p-6 shadow-xl relative overflow-hidden"
+            className="rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] relative"
           >
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+            <div className="flex items-center justify-between pb-4 mb-5 border-b border-white/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  <Bot className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-white">
+                  <Bot className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                     Research Agent Intelligence
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   </h2>
-                  <p className="text-[11px] text-slate-400">Grounded public signals, products, and commercial footprint</p>
+                  <p className="text-[11px] text-zinc-500 font-mono">Grounded live telemetry & market footprint</p>
                 </div>
               </div>
 
               {research ? (
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-white/[0.08]">
                   CONFIDENCE: {Math.round(research.confidence_score * 100)}%
                 </span>
               ) : (
                 <button
                   onClick={handleRunResearch}
                   disabled={Boolean(agentActionLoading)}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold underline"
+                  className="text-xs text-zinc-300 hover:text-white font-mono underline cursor-pointer"
                 >
-                  Run Research →
+                  Run Deep Search →
                 </button>
               )}
             </div>
@@ -476,28 +464,28 @@ export default function LeadDetailPage() {
               <div className="space-y-4 text-xs">
                 {/* Executive Summary */}
                 <div>
-                  <span className="text-[11px] font-mono tracking-wider uppercase text-slate-400 block mb-1.5">Executive Summary</span>
-                  <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 text-slate-200 leading-relaxed">
+                  <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block mb-1.5">Executive Summary</span>
+                  <div className="p-3.5 rounded-xl bg-[#060608] border border-white/[0.06] text-zinc-200 leading-relaxed font-sans text-xs shadow-inner">
                     {research.summary}
                   </div>
                 </div>
 
                 {/* Company Overview */}
                 <div>
-                  <span className="text-[11px] font-mono tracking-wider uppercase text-slate-400 block mb-1.5">Company Overview</span>
-                  <p className="text-slate-300 leading-relaxed px-1">
+                  <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block mb-1.5">Company Overview</span>
+                  <p className="text-zinc-400 leading-relaxed px-1">
                     {research.company_overview}
                   </p>
                 </div>
 
                 {/* Bottlenecks */}
                 <div>
-                  <span className="text-[11px] font-mono tracking-wider uppercase text-slate-400 block mb-1.5">Detected Sales & GTM Bottlenecks</span>
-                  <div className="space-y-2">
+                  <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block mb-1.5">Detected Sales & Operational Bottlenecks</span>
+                  <div className="space-y-1.5">
                     {research.target_pain_points.map((point, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-900/50 border border-white/5 text-slate-300">
-                        <span className="text-rose-400 font-black mt-0.5">•</span>
-                        <span className="leading-relaxed">{point}</span>
+                      <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-950 border border-white/[0.04] text-zinc-300">
+                        <span className="text-zinc-500 font-mono text-xs mt-0.5">•</span>
+                        <span className="leading-relaxed text-xs">{point}</span>
                       </div>
                     ))}
                   </div>
@@ -506,10 +494,10 @@ export default function LeadDetailPage() {
                 {/* Technology Stack */}
                 {research.technology_stack && research.technology_stack.length > 0 && (
                   <div>
-                    <span className="text-[11px] font-mono tracking-wider uppercase text-slate-400 block mb-1.5">Detected Technology Stack</span>
+                    <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block mb-1.5">Detected Technology Stack</span>
                     <div className="flex flex-wrap gap-1.5">
                       {research.technology_stack.map((tech, idx) => (
-                        <span key={idx} className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-white/10 text-[11px] text-cyan-200 font-mono">
+                        <span key={idx} className="px-2.5 py-1 rounded-md bg-zinc-900 border border-white/[0.08] text-[11px] text-zinc-300 font-mono">
                           {tech}
                         </span>
                       ))}
@@ -520,11 +508,11 @@ export default function LeadDetailPage() {
                 {/* Growth Signals */}
                 {research.growth_signals && research.growth_signals.length > 0 && (
                   <div>
-                    <span className="text-[11px] font-mono tracking-wider uppercase text-slate-400 block mb-1.5">Verified Market Signals</span>
+                    <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block mb-1.5">Verified Market Signals</span>
                     <div className="space-y-1.5">
                       {research.growth_signals.map((sig, idx) => (
-                        <div key={idx} className="p-2.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 flex items-start gap-2 text-cyan-200 text-xs">
-                          <TrendingUp className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                        <div key={idx} className="p-2.5 rounded-xl bg-zinc-950 border border-white/[0.04] flex items-start gap-2 text-zinc-300 text-xs">
+                          <TrendingUp className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
                           <span>{sig}</span>
                         </div>
                       ))}
@@ -533,9 +521,9 @@ export default function LeadDetailPage() {
                 )}
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-500">
-                <Bot className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                <p>No research generated yet.</p>
+              <div className="p-8 text-center text-zinc-600">
+                <Bot className="w-6 h-6 mx-auto mb-2 text-zinc-700" />
+                <p className="text-xs font-mono">No research telemetry synthesized.</p>
               </div>
             )}
           </motion.div>
@@ -543,30 +531,27 @@ export default function LeadDetailPage() {
           {/* Card 2: Qualification Agent Scorecard */}
           <motion.div 
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-[#0d1424]/85 backdrop-blur-xl p-6 shadow-xl relative"
+            className="rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] relative"
           >
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+            <div className="flex items-center justify-between pb-4 mb-5 border-b border-white/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <CheckCircle2 className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-white">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    Qualification Agent Scorecard
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
+                  <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                    Qualification Scorecard
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   </h2>
-                  <p className="text-[11px] text-slate-400">Objective Ideal Customer Profile (ICP) Rubric Evaluation</p>
+                  <p className="text-[11px] text-zinc-500 font-mono">Objective ICP Rubric Assessment</p>
                 </div>
               </div>
 
               {qual && (
-                <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
-                  qual.fit_category === "HIGH_FIT" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" :
-                  qual.fit_category === "MEDIUM_FIT" ? "bg-amber-500/10 text-amber-300 border-amber-500/30" :
-                  "bg-rose-500/10 text-rose-300 border-rose-500/30"
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
+                  qual.fit_category === "HIGH_FIT" ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30" :
+                  qual.fit_category === "MEDIUM_FIT" ? "bg-amber-950/40 text-amber-400 border-amber-500/30" :
+                  "bg-zinc-900 text-zinc-400 border-white/[0.1]"
                 }`}>
                   {qual.fit_category.replace("_", " ")}
                 </span>
@@ -576,25 +561,25 @@ export default function LeadDetailPage() {
             {qual ? (
               <div className="space-y-4">
                 {/* Score & Rationale Bento Card */}
-                <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 flex items-center gap-5">
-                  <div className="w-20 h-20 rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center shrink-0 shadow-lg">
-                    <span className={`text-3xl font-black ${
+                <div className="p-4 rounded-xl bg-[#060608] border border-white/[0.06] flex items-center gap-5 shadow-inner">
+                  <div className="w-16 h-16 rounded-xl bg-black border border-white/[0.08] flex flex-col items-center justify-center shrink-0">
+                    <span className={`text-2xl font-light font-mono ${
                       qual.score >= 75 ? "text-emerald-400" :
-                      qual.score >= 50 ? "text-amber-400" : "text-rose-400"
+                      qual.score >= 50 ? "text-amber-400" : "text-zinc-400"
                     }`}>
                       {qual.score}
                     </span>
-                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">/ 100</span>
+                    <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-widest">/ 100</span>
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-400">Recommendation:</span>
-                      <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/30">
+                      <span className="text-[10px] font-mono uppercase text-zinc-500">ACTION:</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold text-zinc-200 bg-zinc-900 border border-white/[0.08]">
                         {qual.recommendation || "PRIORITY_OUTREACH"}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                       {qual.reasoning}
                     </p>
                   </div>
@@ -604,19 +589,19 @@ export default function LeadDetailPage() {
                 {qual.icp_fit_breakdown && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {[
-                      { label: "Role Authority", val: qual.icp_fit_breakdown.role_authority || 25, max: 30 },
-                      { label: "Industry Fit", val: qual.icp_fit_breakdown.industry_fit || 25, max: 30 },
-                      { label: "Company Scale", val: qual.icp_fit_breakdown.company_size_fit || 20, max: 25 },
-                      { label: "Urgency / Intent", val: qual.icp_fit_breakdown.urgency_and_signals || 15, max: 15 },
+                      { label: "Authority", val: qual.icp_fit_breakdown.role_authority || 25, max: 30 },
+                      { label: "Industry", val: qual.icp_fit_breakdown.industry_fit || 25, max: 30 },
+                      { label: "Scale", val: qual.icp_fit_breakdown.company_size_fit || 20, max: 25 },
+                      { label: "Intent", val: qual.icp_fit_breakdown.urgency_and_signals || 15, max: 15 },
                     ].map((item, idx) => (
-                      <div key={idx} className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <div key={idx} className="p-2.5 rounded-xl bg-zinc-950 border border-white/[0.04] space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
                           <span>{item.label}</span>
-                          <span className="font-mono text-slate-300 font-bold">{item.val}/{item.max}</span>
+                          <span className="text-zinc-300 font-semibold">{item.val}/{item.max}</span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div className="w-full h-1 rounded-full bg-zinc-900 overflow-hidden">
                           <div 
-                            className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full"
+                            className="h-full bg-white rounded-full"
                             style={{ width: `${Math.min(100, (item.val / item.max) * 100)}%` }}
                           />
                         </div>
@@ -627,28 +612,28 @@ export default function LeadDetailPage() {
 
                 {/* Positive & Negative Signals Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                  <div className="p-3.5 rounded-xl bg-emerald-950/15 border border-emerald-500/20 space-y-2">
-                    <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                      <CheckCheck className="w-3.5 h-3.5" /> Positive ICP Drivers
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-2">
+                    <span className="text-xs font-mono uppercase text-zinc-400 flex items-center gap-1.5">
+                      <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> Positive ICP Drivers
                     </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-zinc-300">
                       {qual.positive_signals.map((pos, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
-                          <span className="text-emerald-400">✓</span>
+                          <span className="text-emerald-400 font-mono">✓</span>
                           <span>{pos}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-rose-950/15 border border-rose-500/20 space-y-2">
-                    <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Risks & Disqualifiers
+                  <div className="p-3.5 rounded-xl bg-zinc-950 border border-white/[0.06] space-y-2">
+                    <span className="text-xs font-mono uppercase text-zinc-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Risks & Notes
                     </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-zinc-300">
                       {qual.negative_signals.map((neg, idx) => (
                         <li key={idx} className="flex items-start gap-1.5">
-                          <span className="text-rose-400">✕</span>
+                          <span className="text-zinc-500 font-mono">•</span>
                           <span>{neg}</span>
                         </li>
                       ))}
@@ -657,9 +642,9 @@ export default function LeadDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-500">
-                <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                <p>Lead has not been qualified yet.</p>
+              <div className="p-8 text-center text-zinc-600">
+                <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-zinc-700" />
+                <p className="text-xs font-mono">Lead has not been qualified yet.</p>
               </div>
             )}
           </motion.div>
@@ -668,46 +653,43 @@ export default function LeadDetailPage() {
         {/* Right Column: Outreach Email Studio & Activity Trail (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           
-          {/* Card 3: Outreach Email Studio */}
+          {/* Card 3: Outreach Email Studio (Linear / Superhuman Aesthetic) */}
           <motion.div 
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-[#0d1424]/85 backdrop-blur-xl p-6 shadow-xl relative"
+            className="rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] relative"
           >
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+            <div className="flex items-center justify-between pb-4 mb-5 border-b border-white/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                  <Send className="w-5 h-5" />
+                <div className="p-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-white">
+                  <Send className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                     Outreach Email Studio
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   </h2>
-                  <p className="text-[11px] text-slate-400">Autonomous personalized cold outreach cadence</p>
+                  <p className="text-[11px] text-zinc-500 font-mono">Autonomous cold outreach cadence</p>
                 </div>
               </div>
 
               {emailOut && (
-                <div className="flex rounded-xl bg-slate-900 p-1 border border-white/10 text-[11px]">
+                <div className="flex rounded-lg bg-zinc-950 p-1 border border-white/[0.08] text-xs">
                   <button
                     onClick={() => setActiveEmailTab("initial")}
-                    className={`relative px-3 py-1 rounded-lg transition-all ${
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
                       activeEmailTab === "initial"
-                        ? "bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30"
-                        : "text-slate-400 hover:text-white"
+                        ? "bg-zinc-800 text-white font-medium shadow-sm"
+                        : "text-zinc-500 hover:text-white"
                     }`}
                   >
                     Touch 1
                   </button>
                   <button
                     onClick={() => setActiveEmailTab("followup")}
-                    className={`relative px-3 py-1 rounded-lg transition-all ${
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
                       activeEmailTab === "followup"
-                        ? "bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30"
-                        : "text-slate-400 hover:text-white"
+                        ? "bg-zinc-800 text-white font-medium shadow-sm"
+                        : "text-zinc-500 hover:text-white"
                     }`}
                   >
                     Touch 2 (+3d)
@@ -723,19 +705,19 @@ export default function LeadDetailPage() {
                     {/* Subject Line */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-mono uppercase text-slate-400">Subject</span>
+                        <span className="text-[10px] font-mono uppercase text-zinc-500">SUBJECT</span>
                         <button
                           onClick={() => copyToClipboard(emailOut.subject, "subject")}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer"
                         >
                           {copiedField === "subject" ? (
-                            <span className="text-emerald-400 inline-flex items-center gap-1 font-semibold"><Check className="w-3 h-3" /> Copied</span>
+                            <span className="text-emerald-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Copied</span>
                           ) : (
                             <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy</span>
                           )}
                         </button>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 font-mono text-slate-200 text-xs shadow-inner">
+                      <div className="p-3 rounded-xl bg-[#060608] border border-white/[0.06] font-mono text-zinc-200 text-xs shadow-inner">
                         {emailOut.subject}
                       </div>
                     </div>
@@ -743,19 +725,19 @@ export default function LeadDetailPage() {
                     {/* Email Body */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-mono uppercase text-slate-400">Personalized Body</span>
+                        <span className="text-[10px] font-mono uppercase text-zinc-500">PERSONALIZED BODY</span>
                         <button
                           onClick={() => copyToClipboard(emailOut.body, "body")}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer"
                         >
                           {copiedField === "body" ? (
-                            <span className="text-emerald-400 inline-flex items-center gap-1 font-semibold"><Check className="w-3 h-3" /> Copied Email</span>
+                            <span className="text-emerald-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Copied</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy Email</span>
+                            <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy</span>
                           )}
                         </button>
                       </div>
-                      <div className="p-4 rounded-xl bg-slate-900/90 border border-white/10 text-slate-200 whitespace-pre-line leading-relaxed text-xs shadow-inner">
+                      <div className="p-4 rounded-xl bg-[#060608] border border-white/[0.06] text-zinc-200 whitespace-pre-line leading-relaxed text-xs shadow-inner font-sans">
                         {emailOut.body}
                       </div>
                     </div>
@@ -765,38 +747,38 @@ export default function LeadDetailPage() {
                     {/* Follow Up Touch */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-mono uppercase text-slate-400">Follow-Up Subject (+3 Days)</span>
+                        <span className="text-[10px] font-mono uppercase text-zinc-500">FOLLOW-UP SUBJECT (+3 DAYS)</span>
                         <button
                           onClick={() => copyToClipboard(emailOut.follow_up_subject || "", "follow_subj")}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer"
                         >
                           {copiedField === "follow_subj" ? (
-                            <span className="text-emerald-400 inline-flex items-center gap-1 font-semibold"><Check className="w-3 h-3" /> Copied</span>
+                            <span className="text-emerald-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Copied</span>
                           ) : (
                             <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy</span>
                           )}
                         </button>
                       </div>
-                      <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 font-mono text-slate-200 text-xs shadow-inner">
+                      <div className="p-3 rounded-xl bg-[#060608] border border-white/[0.06] font-mono text-zinc-200 text-xs shadow-inner">
                         {emailOut.follow_up_subject || `Follow-up re: ${lead.company_name}`}
                       </div>
                     </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-mono uppercase text-slate-400">Follow-Up Bump Body</span>
+                        <span className="text-[10px] font-mono uppercase text-zinc-500">FOLLOW-UP BODY</span>
                         <button
                           onClick={() => copyToClipboard(emailOut.follow_up_body || "", "follow_body")}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer"
                         >
                           {copiedField === "follow_body" ? (
-                            <span className="text-emerald-400 inline-flex items-center gap-1 font-semibold"><Check className="w-3 h-3" /> Copied</span>
+                            <span className="text-emerald-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Copied</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy Follow-Up</span>
+                            <span className="inline-flex items-center gap-1"><Copy className="w-3 h-3" /> Copy</span>
                           )}
                         </button>
                       </div>
-                      <div className="p-4 rounded-xl bg-slate-900/90 border border-white/10 text-slate-200 whitespace-pre-line leading-relaxed text-xs shadow-inner">
+                      <div className="p-4 rounded-xl bg-[#060608] border border-white/[0.06] text-zinc-200 whitespace-pre-line leading-relaxed text-xs shadow-inner font-sans">
                         {emailOut.follow_up_body || "No follow-up body generated."}
                       </div>
                     </div>
@@ -805,20 +787,50 @@ export default function LeadDetailPage() {
 
                 {/* Personalization Rationale */}
                 {emailOut.personalization_rationale && (
-                  <div className="p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-1">
-                    <span className="text-[11px] font-mono font-bold text-purple-300 block uppercase">
-                      Agent Personalization Rationale
+                  <div className="p-3 rounded-xl bg-zinc-950 border border-white/[0.05] space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-zinc-500 block">
+                      Agent Targeting Rationale
                     </span>
-                    <p className="text-slate-300 leading-relaxed text-[11px]">
+                    <p className="text-zinc-400 leading-relaxed text-xs">
                       {emailOut.personalization_rationale}
                     </p>
                   </div>
                 )}
+
+                {/* Direct Dispatch Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={handleSendEmailNow}
+                    disabled={sendingEmail || emailSentSuccess}
+                    className={`w-full py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      emailSentSuccess 
+                        ? "bg-emerald-950 border border-emerald-500/40 text-emerald-300"
+                        : "bg-white hover:bg-zinc-200 text-black font-semibold shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+                    }`}
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Dispatching via Resend...</span>
+                      </>
+                    ) : emailSentSuccess ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Email Sent Successfully</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send to {lead.contact_email || "Prospect"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-500">
-                <Send className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                <p>No email draft generated yet.</p>
+              <div className="p-8 text-center text-zinc-600">
+                <Send className="w-6 h-6 mx-auto mb-2 text-zinc-700" />
+                <p className="text-xs font-mono">No outreach cadence generated.</p>
               </div>
             )}
           </motion.div>
@@ -826,42 +838,42 @@ export default function LeadDetailPage() {
           {/* Card 4: Activity & Audit Trail */}
           <motion.div 
             variants={itemVariants}
-            className="rounded-2xl border border-white/10 bg-[#0d1424]/85 backdrop-blur-xl p-6 shadow-xl"
+            className="rounded-2xl border border-white/[0.08] bg-[#0a0a0c] p-6 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
           >
-            <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-white/10">
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <Activity className="w-5 h-5" />
+            <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-white/[0.06]">
+              <div className="p-2 rounded-lg bg-zinc-900 border border-white/[0.08] text-white">
+                <Activity className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white">Execution Audit Trail</h2>
-                <p className="text-[11px] text-slate-400">Autonomous logs and agent state transitions</p>
+                <h2 className="text-sm font-semibold text-white">Execution Audit Trail</h2>
+                <p className="text-[11px] text-zinc-500 font-mono">Autonomous agent telemetry</p>
               </div>
             </div>
 
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               {activities.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">No activity logged yet.</p>
+                <p className="text-xs text-zinc-600 font-mono text-center py-4">No events logged yet.</p>
               ) : (
                 activities.map((act) => (
-                  <div key={act.id} className="p-3 rounded-xl bg-slate-900/60 border border-white/5 text-xs space-y-1">
+                  <div key={act.id} className="p-2.5 rounded-xl bg-zinc-950 border border-white/[0.04] text-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-200 font-mono text-[11px]">
+                      <span className="font-medium text-zinc-200 font-mono text-[11px]">
                         {act.action}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <span className="text-[9px] text-zinc-600 font-mono">
                         {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono">
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
+                      <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-white/[0.06]">
                         {act.agent_name || "SYSTEM"}
                       </span>
                       {act.details?.score !== undefined && (
-                        <span>Score: <b>{act.details.score}</b></span>
+                        <span>Score: {act.details.score}</span>
                       )}
                       {act.details?.subject && (
-                        <span className="truncate max-w-[200px]">Subj: {act.details.subject}</span>
+                        <span className="truncate max-w-[180px]">Subj: {act.details.subject}</span>
                       )}
                     </div>
                   </div>
