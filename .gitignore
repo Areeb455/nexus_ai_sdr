@@ -55,4 +55,6 @@ Thumbs.db
 *service_account*.json
 gcp_sa.json
 credentials*.json
+# Dedicated service account for cloud deployment
 backend/*dedicated_key*.json
+*dedicated_key*.json

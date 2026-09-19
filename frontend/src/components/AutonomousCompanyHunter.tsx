@@ -223,3 +223,4 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
     </div>
   );
 }
+

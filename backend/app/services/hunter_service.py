@@ -15,14 +15,14 @@ class HunterService:
     """
 
     def __init__(self):
-        self.api_key = os.getenv("HUNTER_API_KEY", "").strip()
+        self.api_key = os.getenv("HUNTER_API_KEY", "8d8e63ecb78260f6c44fe70f83890760c3c7e5c6").strip()
         self.base_url = "https://api.hunter.io/v2"
 
     async def search_domain(self, domain: str) -> Optional[Dict[str, Any]]:
         """
         Queries Hunter.io Domain Search for real corporate intelligence.
         """
-        api_key = os.getenv("HUNTER_API_KEY", self.api_key)
+        api_key = os.getenv("HUNTER_API_KEY", self.api_key).strip()
         if not api_key:
             return None
 
