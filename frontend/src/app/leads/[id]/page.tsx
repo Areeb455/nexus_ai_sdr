@@ -65,8 +65,12 @@ export default function LeadDetailPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("nexus_auth_token")) {
+      router.push("/login");
+      return;
+    }
     fetchLeadData();
-  }, [leadId]);
+  }, [leadId, router]);
 
   // Agent execution handlers
   const handleRunResearch = async () => {

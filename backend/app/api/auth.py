@@ -12,13 +12,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=F
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     if not token:
-        # Default demo fallback user if no auth token provided in development mode
-        demo_user = db.query(User).filter(User.email == "demo@nexus.ai").first()
-        if demo_user:
-            return demo_user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials required",
+            detail="Authentication token required. Please sign in.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

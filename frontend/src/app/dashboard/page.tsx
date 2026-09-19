@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   Users, 
   CheckCircle2, 
@@ -14,14 +15,16 @@ import {
   Sparkles, 
   Bot, 
   Building2, 
-  ExternalLink,
-  ChevronRight,
-  RefreshCw,
+  ArrowRight, 
+  RefreshCw, 
+  Clock, 
+  AlertTriangle,
   AlertCircle
 } from "lucide-react";
 import { api, LeadSummaryItem, DashboardMetrics } from "@/lib/api";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [leads, setLeads] = useState<LeadSummaryItem[]>([]);
   const [totalLeads, setTotalLeads] = useState<number>(0);
@@ -58,6 +61,10 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("nexus_auth_token")) {
+      router.push("/login");
+      return;
+    }
     loadData();
   }, [searchQuery, statusFilter, fitFilter]);
 

@@ -24,6 +24,12 @@ export default function NewLeadPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("nexus_auth_token")) {
+      router.push("/login");
+    }
+  }, [router]);
+
   const [formData, setFormData] = useState({
     company_name: "",
     contact_name: "",
