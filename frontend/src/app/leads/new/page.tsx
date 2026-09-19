@@ -18,6 +18,7 @@ import {
   Check
 } from "lucide-react";
 import { api } from "@/lib/api";
+import AutonomousCompanyHunter from "@/components/AutonomousCompanyHunter";
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -41,6 +42,31 @@ export default function NewLeadPage() {
     location: "",
     notes: "",
   });
+
+  const [extractQuery, setExtractQuery] = useState("");
+  const [extracting, setExtracting] = useState(false);
+
+  const handleAutoExtract = async () => {
+    if (!extractQuery.trim()) return;
+    setExtracting(true);
+    setError(null);
+    try {
+      const data = await api.leads.extractCompany(extractQuery);
+      setFormData((prev) => ({
+        ...prev,
+        company_name: data.company_name || prev.company_name,
+        website: data.website || (extractQuery.startsWith("http") ? extractQuery : `https://${extractQuery}`),
+        industry: data.industry || prev.industry,
+        company_size: data.company_size || prev.company_size,
+        role: data.suggested_role || prev.role || "VP of Sales & Operations",
+        notes: data.notes || prev.notes,
+      }));
+    } catch (err: any) {
+      setError(err.message || "Failed to auto-extract company data. You can still enter details manually.");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -82,18 +108,66 @@ export default function NewLeadPage() {
         </span>
       </div>
 
+      {/* Autonomous AI Hunter */}
+      <AutonomousCompanyHunter />
+
       <div className="glass-panel p-8">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
-            Create Prospect Account
+            Manual Prospect Account Creation
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Input prospect company details to initialize the Research, Qualification, and Email generation agents.
           </p>
         </div>
 
+        {/* AI Autonomous Company Extractor Bar */}
+        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-900 border border-indigo-500/20 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              ⚡ Autonomous AI Company Enrichment:
+            </span>
+            <span className="text-[11px] text-indigo-300/70">Enter a website or company name to auto-fill</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={extractQuery}
+              onChange={(e) => setExtractQuery(e.target.value)}
+              placeholder="e.g. stripe.com, figma.com, or Datadog"
+              className="flex-1 px-3 py-2 bg-slate-900/90 border border-slate-700/60 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAutoExtract();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAutoExtract}
+              disabled={extracting || !extractQuery.trim()}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {extracting ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-Fill with AI
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Quick Evaluator Presets Bar */}
-        <div className="mt-6 p-4 rounded-xl bg-slate-900/80 border border-white/5 space-y-2.5">
+        <div className="mt-4 p-4 rounded-xl bg-slate-900/80 border border-white/5 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />

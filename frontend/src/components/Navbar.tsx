@@ -10,15 +10,24 @@ import {
   Settings, 
   LogOut, 
   Sparkles,
-  Layers
+  Layers,
+  Zap
 } from "lucide-react";
 import { api, setStoredToken } from "@/lib/api";
+import { UserButton, useUser } from "@clerk/nextjs";
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { isSignedIn: isClerkSignedIn, user: clerkUser } = useUser();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState<string>("Multi-Agent Core");
+
+  useEffect(() => {
+    if (clerkUser?.primaryEmailAddress?.emailAddress) {
+      setUserEmail(clerkUser.primaryEmailAddress.emailAddress);
+    }
+  }, [clerkUser]);
 
   useEffect(() => {
     // Only load if not on login page
@@ -116,20 +125,26 @@ export default function Navbar() {
 
           {/* User profile & Logout */}
           <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-medium text-slate-200">{userEmail || "demo@nexus.ai"}</span>
-              <span className="text-[10px] text-emerald-400 flex items-center gap-1 justify-end">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Connected
-              </span>
-            </div>
-            <button
-              onClick={handleLogout}
-              title="Sign Out"
-              className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {isClerkSignedIn ? (
+              <UserButton />
+            ) : (
+              <>
+                <div className="hidden sm:flex flex-col text-right">
+                  <span className="text-xs font-medium text-slate-200">{userEmail || "demo@nexus.ai"}</span>
+                  <span className="text-[10px] text-emerald-400 flex items-center gap-1 justify-end">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Connected
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

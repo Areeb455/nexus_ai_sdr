@@ -170,6 +170,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ credential }),
       }),
+    clerkSync: (body: { email: string; clerk_user_id: string; full_name?: string }) =>
+      request<{ access_token: string; user: User }>("/auth/clerk", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    devLogin: () =>
+      request<{ access_token: string; user: User }>("/auth/dev-login", {
+        method: "POST",
+      }),
     getMe: () => request<User>("/auth/me"),
   },
   leads: {
@@ -197,6 +206,20 @@ export const api = {
       }),
     delete: (id: number | string) =>
       request<void>(`/leads/${id}`, {
+        method: "DELETE",
+      }),
+    extractCompany: (query: string) =>
+      request<{ company_name?: string; website?: string; industry?: string; company_size?: string; suggested_role?: string; notes?: string }>("/leads/extract-company", {
+        method: "POST",
+        body: JSON.stringify({ query }),
+      }),
+    autonomousHunt: (query: string, auto_run_pipeline: boolean = true) =>
+      request<Lead>("/leads/autonomous-hunt", {
+        method: "POST",
+        body: JSON.stringify({ query, auto_run_pipeline }),
+      }),
+    clearAll: () =>
+      request<{ message: string }>("/leads/dev/clear-all", {
         method: "DELETE",
       }),
   },

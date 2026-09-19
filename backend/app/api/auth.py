@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import User
-from app.schemas.auth import UserRegister, UserLogin, GoogleAuthRequest, Token, UserResponse
+from app.schemas.auth import UserRegister, UserLogin, GoogleAuthRequest, ClerkAuthRequest, Token, UserResponse
 from app.core.security import verify_password, get_password_hash, create_access_token, decode_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -118,6 +118,47 @@ async def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)):
             email=email.lower(),
             hashed_password=get_password_hash(random_pass),
             full_name=full_name
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(user.id)
+    return Token(access_token=token, token_type="bearer", user=UserResponse.model_validate(user))
+
+@router.post("/clerk", response_model=Token)
+def clerk_auth(req: ClerkAuthRequest, db: Session = Depends(get_db)):
+    """
+    Authenticate or provision user authenticated via Clerk Dev Mode.
+    Returns our JWT access token so all subsequent lead and agent requests work seamlessly.
+    """
+    user = db.query(User).filter(User.email == req.email.lower()).first()
+    if not user:
+        random_pass = str(uuid.uuid4())
+        user = User(
+            email=req.email.lower(),
+            hashed_password=get_password_hash(random_pass),
+            full_name=req.full_name or req.email.split("@")[0]
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(user.id)
+    return Token(access_token=token, token_type="bearer", user=UserResponse.model_validate(user))
+
+@router.post("/dev-login", response_model=Token)
+def dev_login(db: Session = Depends(get_db)):
+    """
+    1-click instant login for local developer mode without entering passwords.
+    """
+    demo_email = "demo@nexus.ai"
+    user = db.query(User).filter(User.email == demo_email).first()
+    if not user:
+        user = User(
+            email=demo_email,
+            hashed_password=get_password_hash("password123"),
+            full_name="Alex Rivera (Nexus SDR Dev)"
         )
         db.add(user)
         db.commit()

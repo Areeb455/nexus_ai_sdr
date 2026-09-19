@@ -21,9 +21,11 @@ import {
   AlertTriangle,
   AlertCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from "lucide-react";
 import { api, LeadSummaryItem, DashboardMetrics } from "@/lib/api";
+import AutonomousCompanyHunter from "@/components/AutonomousCompanyHunter";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -32,6 +34,7 @@ export default function DashboardPage() {
   const [totalLeads, setTotalLeads] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [clearing, setClearing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
@@ -59,6 +62,20 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
       if (isManualRefresh) setRefreshing(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (window.confirm("Activate Clean Slate? This will purge all existing leads so you can test autonomous prospecting completely fresh.")) {
+      setClearing(true);
+      try {
+        await api.leads.clearAll();
+        await loadData(true);
+      } catch (err: any) {
+        alert("Failed to clear leads: " + err.message);
+      } finally {
+        setClearing(false);
+      }
     }
   };
 
@@ -148,6 +165,16 @@ export default function DashboardPage() {
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-indigo-400" : ""}`} />
           </button>
 
+          <button
+            onClick={handleClearAll}
+            disabled={clearing || leads.length === 0}
+            title="Clean Slate: Remove sample leads to start fresh"
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {clearing ? "Clearing..." : "Clean Slate"}
+          </button>
+
           <Link
             href="/leads/new"
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all group"
@@ -157,6 +184,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Autonomous AI SDR Hunter & Lead Prospector */}
+      <AutonomousCompanyHunter onSuccess={() => loadData(true)} />
 
       {error && (
         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center justify-between gap-3">

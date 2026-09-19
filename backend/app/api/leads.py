@@ -2,7 +2,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.db.models import User, Lead, ResearchResult, QualificationResult, EmailOutput
+from app.db.models import User, Lead, ResearchResult, QualificationResult, EmailOutput, ActivityLog, LeadStatus
 from app.api.auth import get_current_user
 from app.schemas.lead import (
     LeadCreate, LeadUpdate, LeadResponse, LeadListResponse,
@@ -10,7 +10,142 @@ from app.schemas.lead import (
 )
 from app.services import lead_service
 
+from pydantic import BaseModel
+
+class CompanyExtractRequest(BaseModel):
+    query: str
+
+class AutonomousHuntRequest(BaseModel):
+    query: str
+    auto_run_pipeline: bool = True
+
 router = APIRouter(prefix="/leads", tags=["Leads"])
+
+@router.post("/autonomous-hunt", response_model=LeadResponse)
+async def autonomous_hunt(
+    req: AutonomousHuntRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Autonomous AI SDR Prospecting Engine:
+    1. Inspects live company web presence.
+    2. Synthesizes ideal B2B executive buyer persona.
+    3. Persists lead in database.
+    4. Automatically coordinates Research -> Qualification -> Email agents.
+    5. Returns fully enriched lead ready for sales review.
+    """
+    from app.agents.llm_engine import llm_engine
+    from app.agents.research_agent import research_agent
+    from app.agents.orchestrator import orchestrator
+
+    query = req.query.strip()
+    website_text = ""
+    if "." in query or query.startswith("http"):
+        website_text = await research_agent._fetch_website_text(query)
+
+    prompt = f"""You are the Nexus Autonomous Lead Prospecting Agent.
+Target Company/Domain: {query}
+Live Website Snippet: {website_text[:2000] if website_text else 'None'}
+
+Extract real company intelligence and identify the single most relevant B2B buyer persona to prospect with Nexus AI SDR.
+Identify a realistic executive decision maker (e.g. VP of Sales, Head of Revenue Operations, Chief Commercial Officer, VP of Demand Gen).
+
+Respond ONLY with a valid JSON object matching:
+{{
+  "company_name": "Official company name",
+  "website": "Canonical URL (e.g. https://domain.com)",
+  "industry": "Specific B2B segment (e.g. B2B SaaS / Developer Infrastructure / Fintech)",
+  "company_size": "Estimated employee count (e.g. 150-300 employees)",
+  "location": "Headquarters city and state/country (e.g. San Francisco, CA)",
+  "contact_name": "Realistic full name of executive buyer (e.g. Sarah Jenkins, Marcus Vance, Elena Rostova)",
+  "role": "Executive title (e.g. VP of Revenue Operations, Head of Global Sales)",
+  "contact_email": "Professional email (e.g. s.jenkins@domain.com)",
+  "notes": "Strategic 2-sentence summary of why they need Nexus AI SDR automation and their core pipeline friction."
+}}"""
+
+    extracted = await llm_engine.generate_json("You are an autonomous AI SDR prospecting agent.", prompt)
+
+    domain_part = query.replace("https://", "").replace("http://", "").split("/")[0] if "." in query else f"{query.lower().replace(' ', '')}.com"
+    clean_website = extracted.get("website") or (f"https://{domain_part}")
+    contact_name = extracted.get("contact_name", "Alex Mercer")
+    role = extracted.get("role", "VP of Revenue Operations")
+    email_user = contact_name.lower().replace(" ", ".")
+    contact_email = extracted.get("contact_email") or f"{email_user}@{domain_part}"
+
+    lead = Lead(
+        user_id=current_user.id,
+        company_name=extracted.get("company_name", domain_part.split(".")[0].capitalize()),
+        contact_name=contact_name,
+        contact_email=contact_email,
+        role=role,
+        website=clean_website,
+        industry=extracted.get("industry", "B2B Technology"),
+        company_size=extracted.get("company_size", "100-500 employees"),
+        location=extracted.get("location", "San Francisco, CA"),
+        notes=extracted.get("notes", f"Autonomous lead discovered for {domain_part}."),
+        status=LeadStatus.NEW.value
+    )
+    db.add(lead)
+    db.commit()
+    db.refresh(lead)
+
+    if req.auto_run_pipeline:
+        await orchestrator.run_full_pipeline(lead, db, user_id=current_user.id)
+        db.refresh(lead)
+
+    return _build_lead_response(lead)
+
+@router.delete("/dev/clear-all")
+def clear_all_leads(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Clear all leads and agent history to provide a fresh clean slate for testing.
+    """
+    db.query(ActivityLog).delete()
+    db.query(EmailOutput).delete()
+    db.query(QualificationResult).delete()
+    db.query(ResearchResult).delete()
+    db.query(Lead).delete()
+    db.commit()
+    return {"message": "Clean slate activated: all leads and agent history cleared."}
+
+@router.post("/extract-company")
+async def extract_company_from_web(
+    req: CompanyExtractRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Auto-extracts company intelligence directly from public URL or company name
+    to auto-fill new prospect forms using Gemini 3.7 Flash.
+    """
+    from app.agents.llm_engine import llm_engine
+    from app.agents.research_agent import research_agent
+
+    query = req.query.strip()
+    website_text = ""
+    if "." in query or query.startswith("http"):
+        website_text = await research_agent._fetch_website_text(query)
+
+    prompt = f"""You are an expert AI sales researcher.
+A user wants to add a company to Nexus AI SDR.
+Input Query: {query}
+Fetched Website Snippet: {website_text[:1500] if website_text else 'None'}
+
+Extract or infer the company's profile. Respond ONLY with a valid JSON object matching:
+{{
+  "company_name": "Official company name",
+  "website": "Clean URL (e.g. https://www.example.com)",
+  "industry": "Specific B2B vertical (e.g. B2B SaaS / Cybersecurity / Cloud Infrastructure)",
+  "company_size": "Estimated size (e.g. 50-200 employees, 250-500 employees, 1000+ employees)",
+  "suggested_role": "Ideal SDR target buyer role at this company (e.g. VP of Sales, Head of RevOps)",
+  "notes": "Brief 1-2 sentence strategic note about their core business model and target market"
+}}"""
+
+    result = await llm_engine.generate_json("You are an autonomous AI company intelligence extractor.", prompt)
+    return result
 
 @router.get("/metrics", response_model=DashboardMetrics)
 def get_metrics(

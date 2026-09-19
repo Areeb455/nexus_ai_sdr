@@ -14,6 +14,11 @@ class UserLogin(BaseModel):
 class GoogleAuthRequest(BaseModel):
     credential: str
 
+class ClerkAuthRequest(BaseModel):
+    email: EmailStr
+    clerk_user_id: str
+    full_name: Optional[str] = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

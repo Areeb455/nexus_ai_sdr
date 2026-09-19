@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
   title: "Nexus AI SDR — Multi-Agent Autonomous Sales Platform",
@@ -12,7 +13,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
+  const clerkPubKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  const layout = (
     <html lang="en" className="dark">
       <body className="min-h-screen flex flex-col bg-[#090d16] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
         <Navbar />
@@ -22,4 +25,14 @@ export default function RootLayout({
       </body>
     </html>
   );
+
+  if (clerkPubKey) {
+    return (
+      <ClerkProvider publishableKey={clerkPubKey}>
+        {layout}
+      </ClerkProvider>
+    );
+  }
+
+  return layout;
 }
