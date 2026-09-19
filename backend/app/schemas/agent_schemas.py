@@ -22,6 +22,39 @@ class ResearchAgentOutput(BaseModel):
             return " ".join(str(item) for item in v)
         return str(v) if v is not None else ""
 
+    @field_validator("technology_stack", "target_pain_points", "growth_signals", "sources", mode="before")
+    @classmethod
+    def coerce_to_list_of_str(cls, v):
+        if isinstance(v, list):
+            return [str(item).strip() for item in v if item]
+        if isinstance(v, str):
+            clean = v.strip()
+            if not clean:
+                return []
+            if "\n" in clean:
+                return [line.strip("- •* ") for line in clean.split("\n") if line.strip()]
+            if "," in clean:
+                return [item.strip() for item in clean.split(",") if item.strip()]
+            return [clean]
+        if isinstance(v, dict):
+            return [f"{k}: {val}" for k, val in v.items()]
+        return []
+
+    @field_validator("key_decision_makers", mode="before")
+    @classmethod
+    def coerce_decision_makers(cls, v):
+        if isinstance(v, list):
+            res = []
+            for item in v:
+                if isinstance(item, dict):
+                    res.append(item)
+                elif isinstance(item, str):
+                    res.append({"name": item, "role": "Key Decision Maker", "relevance": "Outbound prospect"})
+            return res
+        if isinstance(v, str) and v.strip():
+            return [{"name": v.strip(), "role": "Key Decision Maker", "relevance": "Outbound prospect"}]
+        return []
+
 class QualificationAgentOutput(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Overall ICP fit score between 0 and 100")
     fit_category: str = Field(..., description="HIGH_FIT, MEDIUM_FIT, or LOW_FIT")
@@ -41,6 +74,22 @@ class QualificationAgentOutput(BaseModel):
         if isinstance(v, dict):
             return " ".join(f"{k.capitalize()}: {val}" for k, val in v.items())
         return str(v) if v is not None else ""
+
+    @field_validator("positive_signals", "negative_signals", mode="before")
+    @classmethod
+    def coerce_signals(cls, v):
+        if isinstance(v, list):
+            return [str(item).strip() for item in v if item]
+        if isinstance(v, str):
+            clean = v.strip()
+            if not clean:
+                return []
+            if "\n" in clean:
+                return [line.strip("- •* ") for line in clean.split("\n") if line.strip()]
+            if "," in clean:
+                return [item.strip() for item in clean.split(",") if item.strip()]
+            return [clean]
+        return []
 
 class EmailAgentOutput(BaseModel):
     subject: str = Field(..., description="Compelling, personalized email subject line")
