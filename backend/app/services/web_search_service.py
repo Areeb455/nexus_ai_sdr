@@ -1,8 +1,12 @@
 import logging
 import httpx
 import re
-from bs4 import BeautifulSoup
 from typing import Dict, Any, List, Optional
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 logger = logging.getLogger(__name__)
 
@@ -34,19 +38,35 @@ class WebSearchService:
             async with httpx.AsyncClient(timeout=5.0, follow_redirects=True, verify=False) as client:
                 h_res = await client.get(f"https://{domain_to_fetch}", headers=headers)
                 if h_res.status_code == 200:
-                    h_soup = BeautifulSoup(h_res.text, "html.parser")
-                    title = h_soup.title.string.strip() if (h_soup.title and h_soup.title.string) else ""
+                    title = ""
                     desc = ""
-                    meta_desc = h_soup.find("meta", attrs={"name": "description"}) or h_soup.find("meta", attrs={"property": "og:description"})
-                    if meta_desc and meta_desc.get("content"):
-                        desc = meta_desc["content"].strip()
-                    
-                    # Extract headings and paragraphs
                     body_snippets = []
-                    for tag in h_soup.find_all(["h1", "h2", "p"])[:10]:
-                        txt = tag.get_text().strip()
-                        if len(txt) > 20 and not any(skip in txt.lower() for skip in ["cookie", "privacy", "sign in", "all rights reserved"]):
-                            body_snippets.append(txt)
+
+                    if BeautifulSoup:
+                        h_soup = BeautifulSoup(h_res.text, "html.parser")
+                        title = h_soup.title.string.strip() if (h_soup.title and h_soup.title.string) else ""
+                        meta_desc = h_soup.find("meta", attrs={"name": "description"}) or h_soup.find("meta", attrs={"property": "og:description"})
+                        if meta_desc and meta_desc.get("content"):
+                            desc = meta_desc["content"].strip()
+                        
+                        for tag in h_soup.find_all(["h1", "h2", "p"])[:10]:
+                            txt = tag.get_text().strip()
+                            if len(txt) > 20 and not any(skip in txt.lower() for skip in ["cookie", "privacy", "sign in", "all rights reserved"]):
+                                body_snippets.append(txt)
+                    else:
+                        t_match = re.search(r"<title[^>]*>(.*?)</title>", h_res.text, re.IGNORECASE | re.DOTALL)
+                        if t_match:
+                            title = t_match.group(1).strip()
+                        d_match = re.search(r'<meta[^>]+(?:name|property)=["\'](?:description|og:description)["\'][^>]+content=["\']([^"\']+)["\']', h_res.text, re.IGNORECASE)
+                        if d_match:
+                            desc = d_match.group(1).strip()
+                        raw_clean = re.sub(r"<[^>]+>", " ", h_res.text)
+                        for chunk in raw_clean.split("  "):
+                            chunk = chunk.strip()
+                            if len(chunk) > 30 and not any(skip in chunk.lower() for skip in ["cookie", "privacy", "javascript"]):
+                                body_snippets.append(chunk)
+                                if len(body_snippets) >= 4:
+                                    break
                     
                     homepage_summary = f"Title: {title}\nMeta: {desc}\nLive Copy: {' | '.join(body_snippets[:4])}"
                     intel_sources.append(f"Direct Website: https://{domain_to_fetch}")
@@ -76,8 +96,14 @@ class WebSearchService:
             async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
                 d_res = await client.get(ddg_url, headers=ddg_headers)
                 if d_res.status_code == 200:
-                    d_soup = BeautifulSoup(d_res.text, "html.parser")
-                    snips = [a.get_text().strip() for a in d_soup.find_all(class_="result__snippet")]
+                    snips = []
+                    if BeautifulSoup:
+                        d_soup = BeautifulSoup(d_res.text, "html.parser")
+                        snips = [a.get_text().strip() for a in d_soup.find_all(class_="result__snippet")]
+                    else:
+                        raw_snips = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', d_res.text, re.IGNORECASE | re.DOTALL)
+                        snips = [re.sub(r"<[^>]+>", "", s).strip() for s in raw_snips]
+                    
                     for s in snips[:4]:
                         if len(s) > 25 and search_term.lower() in s.lower():
                             real_facts.append(f"Market Report: {s}")
