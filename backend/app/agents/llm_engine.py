@@ -7,11 +7,18 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Verified working Gemini model names for this API endpoint (in priority order)
+# gemini-3.6-flash = recommended by Google API for latest features
+# gemini-2.5-flash = confirmed working in live test
+# gemini-1.5-flash = stable legacy fallback
+VERTEX_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+
 class LLMEngine:
     """
     Unified LLM provider interface supporting:
     1. Google Cloud Vertex AI (gemini-2.5-flash) via Service Account
-    2. Google AI Studio Gemini API (gemini-2.5-flash / gemini-1.5-flash)
+    2. Google AI Studio Gemini API (gemini-2.5-flash / gemini-2.0-flash / gemini-1.5-flash)
     3. OpenAI API (gpt-4o-mini)
     4. Context-aware intelligent heuristic fallback engine
     """
@@ -91,9 +98,9 @@ class LLMEngine:
 
     def get_active_provider(self) -> str:
         if self.vertex_client:
-            return "Google Cloud Vertex AI (gemini-3.6-flash via Service Account)"
+            return "Google Cloud Vertex AI (gemini-2.5-flash via Service Account)"
         if self.gemini_key:
-            return "Google Gemini AI Studio (gemini-3.6-flash)"
+            return "Google Gemini AI Studio (gemini-2.5-flash)"
         if self.openai_key:
             return "OpenAI (gpt-4o-mini)"
         return "Nexus Heuristic AI Engine (Dynamic Local Analysis)"
@@ -102,45 +109,74 @@ class LLMEngine:
         """
         Generate structured JSON from LLM or fallback engine.
         """
+        full_json_prompt = (
+            f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\n"
+            "IMPORTANT: Respond ONLY with a valid JSON object. "
+            "No Markdown code fences, no explanation, no preamble. "
+            "Start your response directly with '{' and end with '}'."
+        )
+
         # 1. Try Vertex AI with service account credentials
         if self.vertex_client:
-            for model_choice in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
+            for model_choice in VERTEX_MODELS:
                 try:
-                    full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with a valid JSON object. No Markdown code blocks, no explanation text."
                     response = self.vertex_client.models.generate_content(
                         model=model_choice,
-                        contents=full_prompt
+                        contents=full_json_prompt
                     )
-                    if response and response.text:
-                        cleaned_text = self._clean_json_str(response.text)
+                    raw_text = getattr(response, 'text', None)
+                    if raw_text:
+                        cleaned_text = self._clean_json_str(raw_text)
                         parsed = json.loads(cleaned_text)
                         if isinstance(parsed, dict) and len(parsed) > 0:
+                            logger.info(f"Vertex AI ({model_choice}) succeeded.")
                             return parsed
+                    else:
+                        logger.warning(f"Vertex AI ({model_choice}) returned empty text — skipping.")
                 except Exception as e:
                     logger.warning(f"Vertex AI ({model_choice}) invocation failed: {e}.")
 
-        # 2. Try Google AI Studio Gemini API if configured
+        # 2. Try Google AI Studio Gemini API (new google-genai SDK)
         if self.gemini_key:
-            try:
-                from google import genai
-                g_client = genai.Client(api_key=self.gemini_key)
-                for model_choice in ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]:
-                    try:
-                        full_prompt = f"{system_prompt}\n\nUSER REQUEST:\n{user_prompt}\n\nRespond ONLY with valid JSON."
-                        response = g_client.models.generate_content(
+            import asyncio
+            from google import genai as google_genai
+            g_client = google_genai.Client(api_key=self.gemini_key)
+            for model_choice in GEMINI_MODELS:
+                try:
+                    # google-genai uses sync generate_content; run in thread to avoid blocking
+                    def _sync_call():
+                        return g_client.models.generate_content(
                             model=model_choice,
-                            contents=full_prompt
+                            contents=full_json_prompt,
+                            config=google_genai.types.GenerateContentConfig(
+                                system_instruction=(
+                                    "You are a structured JSON generation assistant. "
+                                    "Always respond with valid JSON only — no markdown, no explanations."
+                                ),
+                                temperature=0.3,
+                                candidate_count=1,
+                            )
                         )
-                        if response and response.text:
-                            cleaned_text = self._clean_json_str(response.text)
-                            parsed = json.loads(cleaned_text)
-                            if isinstance(parsed, dict) and len(parsed) > 0:
-                                return parsed
-                    except Exception as model_err:
-                        logger.warning(f"Gemini AI Studio {model_choice} error: {model_err}")
-                        continue
-            except Exception as e:
-                logger.error(f"Gemini API invocation failed: {e}. Falling back to OpenAI or Heuristics.")
+                    response = await asyncio.to_thread(_sync_call)
+                    raw_text = None
+                    try:
+                        raw_text = response.text
+                    except Exception:
+                        # Safety blocks — try candidates fallback
+                        if response.candidates and response.candidates[0].content.parts:
+                            raw_text = response.candidates[0].content.parts[0].text
+                    if raw_text:
+                        cleaned_text = self._clean_json_str(raw_text)
+                        parsed = json.loads(cleaned_text)
+                        if isinstance(parsed, dict) and len(parsed) > 0:
+                            logger.info(f"Gemini AI Studio ({model_choice}) succeeded.")
+                            return parsed
+                    else:
+                        logger.warning(f"Gemini AI Studio ({model_choice}) returned empty response — skipping.")
+                except json.JSONDecodeError as jde:
+                    logger.warning(f"Gemini ({model_choice}) returned invalid JSON: {jde}")
+                except Exception as model_err:
+                    logger.warning(f"Gemini AI Studio {model_choice} error: {model_err}")
 
         # 3. Try OpenAI if configured
         if self.openai_key:
@@ -162,6 +198,7 @@ class LLMEngine:
                 logger.warning(f"OpenAI API invocation failed: {e}. Falling back to Heuristic Engine.")
 
         # 4. Dynamic context-aware heuristic generation
+        logger.warning("All LLM providers failed — using heuristic fallback.")
         return self._heuristic_fallback(system_prompt, user_prompt)
 
     def _clean_json_str(self, text: str) -> str:
