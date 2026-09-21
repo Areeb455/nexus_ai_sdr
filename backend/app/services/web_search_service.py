@@ -38,7 +38,7 @@ class WebSearchService:
         async def crawl_homepage():
             nonlocal homepage_summary
             try:
-                async with httpx.AsyncClient(timeout=4.0, follow_redirects=True, verify=False) as client:
+                async with httpx.AsyncClient(timeout=2.5, follow_redirects=True, verify=False) as client:
                     h_res = await client.get(f"https://{domain_to_fetch}", headers=headers)
                     if h_res.status_code == 200:
                         title = ""
@@ -81,7 +81,7 @@ class WebSearchService:
         async def crawl_wikipedia():
             try:
                 wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={search_term}+company&format=json"
-                async with httpx.AsyncClient(timeout=3.5, follow_redirects=True) as client:
+                async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
                     w_res = await client.get(wiki_url, headers=headers)
                     if w_res.status_code == 200:
                         items = w_res.json().get("query", {}).get("search", [])
@@ -93,10 +93,11 @@ class WebSearchService:
                 logger.debug(f"[WebSearch] Wikipedia query failed: {e}")
 
         async def crawl_ddg():
+            ddg_found = False
             try:
                 ddg_url = f"https://html.duckduckgo.com/html/?q={search_term.replace(' ', '+')}+funding+headcount+revenue+ARR"
                 ddg_headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as client:
+                async with httpx.AsyncClient(timeout=2.5, follow_redirects=True) as client:
                     d_res = await client.get(ddg_url, headers=ddg_headers)
                     if d_res.status_code == 200:
                         snips = []
@@ -106,20 +107,21 @@ class WebSearchService:
                         else:
                             raw_snips = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', d_res.text, re.IGNORECASE | re.DOTALL)
                             snips = [re.sub(r"<[^>]+>", "", s).strip() for s in raw_snips]
-                        
+
                         for s in snips[:4]:
                             if len(s) > 25 and search_term.lower() in s.lower():
                                 real_facts.append(f"Market Report: {s}")
+                                ddg_found = True
                         if snips:
                             intel_sources.append("Public Market Indices")
             except Exception as e:
                 logger.debug(f"[WebSearch] DDG query failed: {e}")
 
-            # Try DDG Instant Answer API if HTML scraper had no results
-            if not any("Market Report" in f for f in real_facts):
+            # Only hit DDG Instant API if HTML scrape found nothing (avoids extra sequential request)
+            if not ddg_found:
                 try:
                     ddg_api_url = f"https://api.duckduckgo.com/?q={search_term.replace(' ', '+')}&format=json"
-                    async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as client:
+                    async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
                         api_res = await client.get(ddg_api_url, headers=headers)
                         if api_res.status_code == 200:
                             api_data = api_res.json()

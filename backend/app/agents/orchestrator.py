@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -190,12 +191,29 @@ class AgentOrchestrator:
     async def run_full_pipeline(self, lead: Lead, db: Session, user_id: Optional[int] = None) -> AgentPipelineResponse:
         """
         Execute full end-to-end pipeline:
-        Lead -> Research Agent -> Qualification Agent -> Email Agent -> Human Ready
+        Lead -> Research Agent -> [Qualification Agent || Email Agent] -> Human Ready
+
+        Optimization: Qualification and Email run in parallel after Research completes.
         """
+        # ── Step 1: Research (must complete first — qual & email depend on it) ──
         state = self._init_state_from_lead(lead)
-        
-        # Step 1: Research
         research_out = await research_agent.run(state)
+        state.research = research_out  # Pre-load research into state
+
+        # ── Step 2: Qualification + Email in PARALLEL ──
+        # Give each agent its own state copy so they don't share mutable references
+        qual_state = self._init_state_from_lead(lead)
+        qual_state.research = research_out
+
+        email_state = self._init_state_from_lead(lead)
+        email_state.research = research_out
+
+        qual_out, email_out = await asyncio.gather(
+            qualification_agent.run(qual_state),
+            email_agent.run(email_state),
+        )
+
+        # ── Persist all results ──
         db_research = ResearchResult(
             lead_id=lead.id,
             summary=research_out.summary,
@@ -210,8 +228,6 @@ class AgentOrchestrator:
         )
         db.add(db_research)
 
-        # Step 2: Qualification
-        qual_out = await qualification_agent.run(state)
         db_qual = QualificationResult(
             lead_id=lead.id,
             score=qual_out.score,
@@ -223,14 +239,6 @@ class AgentOrchestrator:
         )
         db.add(db_qual)
 
-        # Update lead status
-        if qual_out.score >= 50:
-            lead.status = LeadStatus.QUALIFIED.value
-        else:
-            lead.status = LeadStatus.DISQUALIFIED.value
-
-        # Step 3: Email Generation
-        email_out = await email_agent.run(state)
         db_email = EmailOutput(
             lead_id=lead.id,
             subject=email_out.subject,
@@ -242,14 +250,20 @@ class AgentOrchestrator:
         )
         db.add(db_email)
 
-        # Audit Activity
+        # ── Update lead status ──
+        if qual_out.score >= 50:
+            lead.status = LeadStatus.QUALIFIED.value
+        else:
+            lead.status = LeadStatus.DISQUALIFIED.value
+
+        # ── Audit log ──
         activity = ActivityLog(
             lead_id=lead.id,
             user_id=user_id,
             action="FULL_PIPELINE_EXECUTED",
             agent_name="MULTI_AGENT_ORCHESTRATOR",
             details={
-                "steps_completed": ["RESEARCH", "QUALIFICATION", "EMAIL"],
+                "steps_completed": ["RESEARCH", "QUALIFICATION (parallel)", "EMAIL (parallel)"],
                 "qualification_score": qual_out.score,
                 "fit_category": qual_out.fit_category,
                 "email_subject": email_out.subject
@@ -268,3 +282,4 @@ class AgentOrchestrator:
         )
 
 orchestrator = AgentOrchestrator()
+
