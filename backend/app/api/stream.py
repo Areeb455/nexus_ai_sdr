@@ -46,136 +46,87 @@ async def stream_pipeline(
 
             yield _sse_event("started", {"message": "Pipeline initiated", "lead_id": lead_id})
 
-            # ── Step 1: Research ──────────────────────────────────────────────────
-            state = AgentWorkflowState(
-                lead_id=lead.id,
-                company_name=lead.company_name,
-                contact_name=lead.contact_name,
-                contact_email=lead.contact_email,
-                role=lead.role,
-                website=lead.website,
-                industry=lead.industry,
-                company_size=lead.company_size,
-                location=lead.location,
-                notes=lead.notes,
+            from app.agents.unified_pipeline import unified_pipeline
+            synth = await unified_pipeline.run_unified_synthesis(
+                company_query=lead.company_name,
+                website_hint=lead.website,
+                contact_name_hint=lead.contact_name,
+                role_hint=lead.role,
+                notes_hint=lead.notes,
             )
 
-            research_out = await research_agent.run(state)
-            state.research = research_out
+            res_data = synth.get("research", {})
+            qual_data = synth.get("qualification", {})
+            email_data = synth.get("email", {})
+            lead_update = synth.get("lead", {})
+
+            # Update contact info if unified pipeline identified a real named executive
+            if lead_update.get("contact_name") and any(phr in (lead.contact_name or "") for phr in ["Not available", "None", "", "Key Decision Maker", "Executive Leader"]):
+                lead.contact_name = lead_update["contact_name"]
+            if lead_update.get("role") and (not lead.role or "Unknown" in lead.role):
+                lead.role = lead_update["role"]
+            if lead_update.get("contact_email") and (not lead.contact_email or "contact@" in (lead.contact_email or "")):
+                lead.contact_email = lead_update["contact_email"]
 
             # Persist research
             db_research = ResearchResult(
                 lead_id=lead.id,
-                summary=research_out.summary,
-                company_overview=research_out.company_overview,
-                target_pain_points=research_out.target_pain_points,
-                key_decision_makers=research_out.key_decision_makers,
-                technology_stack=research_out.technology_stack,
-                growth_signals=research_out.growth_signals,
-                sources=research_out.sources,
-                confidence_score=research_out.confidence_score,
-                raw_data=research_out.model_dump(),
+                summary=res_data.get("summary", ""),
+                company_overview=res_data.get("company_overview", ""),
+                target_pain_points=res_data.get("target_pain_points", []),
+                key_decision_makers=res_data.get("key_decision_makers", []),
+                technology_stack=res_data.get("technology_stack", []),
+                growth_signals=res_data.get("growth_signals", []),
+                sources=res_data.get("sources", [lead.website]),
+                confidence_score=float(res_data.get("confidence_score", 0.88)),
+                raw_data=res_data,
             )
             gen_db.add(db_research)
-            if lead.status == LeadStatus.NEW.value:
-                lead.status = LeadStatus.RESEARCHED.value
-            gen_db.commit()
 
-            # Emit research immediately
-            yield _sse_event("research_done", {
-                "summary": research_out.summary,
-                "company_overview": research_out.company_overview,
-                "target_pain_points": research_out.target_pain_points,
-                "key_decision_makers": research_out.key_decision_makers,
-                "technology_stack": research_out.technology_stack,
-                "growth_signals": research_out.growth_signals,
-                "sources": research_out.sources,
-                "confidence_score": research_out.confidence_score,
-            })
+            score = int(qual_data.get("score", 70))
+            fit_category = qual_data.get("fit_category", "HIGH_FIT" if score >= 75 else "MEDIUM_FIT")
+            lead.status = LeadStatus.QUALIFIED.value if score >= 50 else LeadStatus.DISQUALIFIED.value
 
-            # ── Step 2 & 3: Qualification + Email in PARALLEL ────────────────────
-            qual_state = AgentWorkflowState(
-                lead_id=lead.id, company_name=lead.company_name, contact_name=lead.contact_name,
-                contact_email=lead.contact_email, role=lead.role, website=lead.website,
-                industry=lead.industry, company_size=lead.company_size, location=lead.location, notes=lead.notes,
-            )
-            qual_state.research = research_out
-
-            email_state = AgentWorkflowState(
-                lead_id=lead.id, company_name=lead.company_name, contact_name=lead.contact_name,
-                contact_email=lead.contact_email, role=lead.role, website=lead.website,
-                industry=lead.industry, company_size=lead.company_size, location=lead.location, notes=lead.notes,
-            )
-            email_state.research = research_out
-
-            qual_out, email_out = await asyncio.gather(
-                qualification_agent.run(qual_state),
-                email_agent.run(email_state),
-            )
-
-            # Persist qualification
             db_qual = QualificationResult(
                 lead_id=lead.id,
-                score=qual_out.score,
-                fit_category=qual_out.fit_category,
-                reasoning=qual_out.reasoning,
-                positive_signals=qual_out.positive_signals,
-                negative_signals=qual_out.negative_signals,
-                icp_fit_breakdown=qual_out.icp_fit_breakdown,
+                score=score,
+                fit_category=fit_category,
+                reasoning=qual_data.get("reasoning", ""),
+                positive_signals=qual_data.get("positive_signals", []),
+                negative_signals=qual_data.get("negative_signals", []),
+                icp_fit_breakdown=qual_data.get("icp_fit_breakdown", {}),
             )
             gen_db.add(db_qual)
 
-            # Persist email
             db_email = EmailOutput(
                 lead_id=lead.id,
-                subject=email_out.subject,
-                body=email_out.body,
-                follow_up_subject=email_out.follow_up_subject,
-                follow_up_body=email_out.follow_up_body,
-                personalization_rationale=email_out.personalization_rationale,
-                tone=email_out.tone,
+                subject=email_data.get("subject", ""),
+                body=email_data.get("body", ""),
+                follow_up_subject=email_data.get("follow_up_subject", ""),
+                follow_up_body=email_data.get("follow_up_body", ""),
+                personalization_rationale=email_data.get("personalization_rationale", ""),
+                tone=email_data.get("tone", "professional_concise"),
             )
             gen_db.add(db_email)
 
-            # Update lead status
-            if qual_out.score >= 50:
-                lead.status = LeadStatus.QUALIFIED.value
-            else:
-                lead.status = LeadStatus.DISQUALIFIED.value
-
-            # Audit log
             gen_db.add(ActivityLog(
                 lead_id=lead.id,
                 user_id=current_user.id,
                 action="FULL_PIPELINE_EXECUTED",
                 agent_name="MULTI_AGENT_ORCHESTRATOR",
                 details={
-                    "steps_completed": ["RESEARCH", "QUALIFICATION (parallel)", "EMAIL (parallel)"],
-                    "qualification_score": qual_out.score,
-                    "fit_category": qual_out.fit_category,
-                    "email_subject": email_out.subject,
+                    "steps_completed": ["RESEARCH", "QUALIFICATION", "EMAIL"],
+                    "score": score,
+                    "fit_category": fit_category,
+                    "subject": email_data.get("subject"),
                 },
             ))
             gen_db.commit()
 
-            # Emit qual + email together
-            yield _sse_event("qual_done", {
-                "score": qual_out.score,
-                "fit_category": qual_out.fit_category,
-                "reasoning": qual_out.reasoning,
-                "positive_signals": qual_out.positive_signals,
-                "negative_signals": qual_out.negative_signals,
-                "icp_fit_breakdown": qual_out.icp_fit_breakdown,
-                "recommendation": qual_out.recommendation,
-            })
-            yield _sse_event("email_done", {
-                "subject": email_out.subject,
-                "body": email_out.body,
-                "follow_up_subject": email_out.follow_up_subject,
-                "follow_up_body": email_out.follow_up_body,
-                "personalization_rationale": email_out.personalization_rationale,
-                "tone": email_out.tone,
-            })
+            # Emit events
+            yield _sse_event("research_done", res_data)
+            yield _sse_event("qual_done", qual_data)
+            yield _sse_event("email_done", email_data)
             yield _sse_event("complete", {
                 "status": lead.status,
                 "message": "Pipeline complete",

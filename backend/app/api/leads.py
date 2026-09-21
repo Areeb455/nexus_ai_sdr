@@ -69,6 +69,15 @@ async def autonomous_hunt(
         )
 
     try:
+        if req.auto_run_pipeline:
+            from app.agents.unified_pipeline import unified_pipeline
+            lead = await unified_pipeline.execute_and_persist_lead(
+                db=db,
+                user_id=current_user.id,
+                company_query=query,
+            )
+            return _build_lead_response(lead)
+
         # 1. Multi-source live web search & verified metric extraction
         web_intel = await web_search_service.search_company_intel(query)
         live_facts = "\n".join(web_intel.get("real_facts", []))
@@ -179,10 +188,6 @@ Respond ONLY with a valid JSON object matching:
         db.add(lead)
         db.commit()
         db.refresh(lead)
-
-        if req.auto_run_pipeline:
-            await orchestrator.run_full_pipeline(lead, db, user_id=current_user.id)
-            db.refresh(lead)
 
         return _build_lead_response(lead)
     except HTTPException:
