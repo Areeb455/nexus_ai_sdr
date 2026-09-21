@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 # gemini-3.6-flash = recommended by Google API for latest features
 # gemini-2.5-flash = confirmed working in live test
 # gemini-1.5-flash = stable legacy fallback
-VERTEX_MODELS = ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]
-GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"]
+VERTEX_MODELS = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]
+GEMINI_MODELS = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.5-flash"]
 
 class LLMEngine:
     """
