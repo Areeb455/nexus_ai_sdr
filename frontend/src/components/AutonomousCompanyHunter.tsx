@@ -12,7 +12,7 @@ import {
   Building2, 
   Zap
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, setStoredToken } from "@/lib/api";
 
 interface Props {
   onSuccess?: () => void;
@@ -209,9 +209,28 @@ export default function AutonomousCompanyHunter({ onSuccess, inline = false }: P
 
         {/* Error message */}
         {error && (
-          <div className="p-3 rounded-xl bg-zinc-950 border border-red-500/30 text-xs font-mono text-red-400 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>{error}</span>
+          <div className="p-3 rounded-xl bg-zinc-950 border border-red-500/30 text-xs font-mono text-red-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+            {error.toLowerCase().includes("token") || error.toLowerCase().includes("sign in") ? (
+              <button
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    const r = await api.auth.devLogin();
+                    setStoredToken(r.access_token);
+                    handleHunt();
+                  } catch {
+                    window.location.href = "/login";
+                  }
+                }}
+                className="px-3 py-1 rounded-lg bg-white hover:bg-zinc-200 text-black text-[11px] font-semibold transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
+              >
+                Re-Authenticate & Retry
+              </button>
+            ) : null}
           </div>
         )}
       </div>

@@ -121,7 +121,7 @@ export function setStoredToken(token: string | null) {
   }
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -134,6 +134,27 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const url = `${API_BASE_URL}${endpoint}`;
   const res = await fetch(url, { ...options, headers });
+
+  // If token is expired or unauthorized, automatically refresh session & retry once
+  if (res.status === 401 && !endpoint.startsWith("/auth/") && !isRetry) {
+    try {
+      const renewRes = await fetch(`${API_BASE_URL}/auth/dev-login`, { method: "POST" });
+      if (renewRes.ok) {
+        const renewData = await renewRes.json();
+        if (renewData?.access_token) {
+          setStoredToken(renewData.access_token);
+          return request<T>(endpoint, options, true);
+        }
+      }
+    } catch (renewErr) {
+      console.warn("[API] Silent session refresh failed:", renewErr);
+    }
+
+    setStoredToken(null);
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }
 
   if (!res.ok) {
     let errorDetail = "API request failed";

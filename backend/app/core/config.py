@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # Security
     JWT_SECRET: str = "super-secret-nexus-key-change-in-production-2026-secure-token"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 days
     
     # Database
     # Default to SQLite for zero-setup local running; easily overridden by POSTGRESQL URL
