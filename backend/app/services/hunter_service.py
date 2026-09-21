@@ -13,6 +13,7 @@ class HunterService:
     Hunter.io B2B Intelligence Service:
     Pulls real verified domain patterns, executive decision-makers, and business emails.
     """
+    _CACHE: Dict[str, Any] = {}
 
     def __init__(self):
         self.api_key = os.getenv("HUNTER_API_KEY", "8d8e63ecb78260f6c44fe70f83890760c3c7e5c6").strip()
@@ -22,13 +23,17 @@ class HunterService:
         """
         Queries Hunter.io Domain Search for real corporate intelligence.
         """
-        api_key = os.getenv("HUNTER_API_KEY", self.api_key).strip()
-        if not api_key:
+        # Clean domain
+        clean_domain = domain.replace("https://", "").replace("http://", "").split("/")[0].strip().lower()
+        if not clean_domain or "." not in clean_domain:
             return None
 
-        # Clean domain
-        clean_domain = domain.replace("https://", "").replace("http://", "").split("/")[0].strip()
-        if not clean_domain or "." not in clean_domain:
+        if clean_domain in self._CACHE:
+            logger.info(f"[HunterService] Cache HIT for {clean_domain}")
+            return self._CACHE[clean_domain]
+
+        api_key = os.getenv("HUNTER_API_KEY", self.api_key).strip()
+        if not api_key:
             return None
 
         url = f"{self.base_url}/domain-search"
@@ -102,7 +107,7 @@ class HunterService:
                         "confidence": e.get("confidence", 75)
                     })
 
-                return {
+                result = {
                     "source": "Hunter.io Verified Intelligence",
                     "company_name": organization,
                     "domain": clean_domain,
@@ -111,6 +116,8 @@ class HunterService:
                     "best_contact": contact_info,
                     "all_contacts": clean_all_contacts
                 }
+                self._CACHE[clean_domain] = result
+                return result
 
         except Exception as e:
             logger.error(f"[HunterService] Error querying Hunter.io for {clean_domain}: {e}")

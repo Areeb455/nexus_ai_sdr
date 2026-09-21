@@ -19,11 +19,16 @@ class WebSearchService:
     3. DuckDuckGo Search (valuation, headcount, ARR, funding rounds, real customer stats)
     4. Structured Numeric & Metric Intelligence Extraction (Strictly verified real numbers)
     """
+    _CACHE: Dict[str, Dict[str, Any]] = {}
 
     async def search_company_intel(self, query: str) -> Dict[str, Any]:
-        clean_q = query.replace("https://", "").replace("http://", "").split("/")[0].strip()
+        clean_q = query.replace("https://", "").replace("http://", "").split("/")[0].strip().lower()
+        if clean_q in self._CACHE:
+            logger.info(f"[WebSearch] Cache HIT for {clean_q}")
+            return self._CACHE[clean_q]
+
         search_term = clean_q.replace(".com", "").replace(".io", "").replace(".app", "").replace(".ai", "").replace(".co", "")
-        domain_to_fetch = clean_q if "." in clean_q else f"{clean_q.lower()}.com"
+        domain_to_fetch = clean_q if "." in clean_q else f"{clean_q}.com"
 
         intel_sources: List[str] = []
         real_facts: List[str] = []
@@ -143,12 +148,18 @@ class WebSearchService:
                 real_facts.append("Official Registry: Linear Orbit, Inc. is a San Francisco-based issue tracking and product development software platform founded by Karri Saarinen, scaling to $100M ARR with 118 employees.")
                 intel_sources.append("Corporate Index (Linear)")
 
-        await asyncio.gather(
-            crawl_homepage(),
-            crawl_wikipedia(),
-            crawl_ddg(),
-            return_exceptions=True
-        )
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(
+                    crawl_homepage(),
+                    crawl_wikipedia(),
+                    crawl_ddg(),
+                    return_exceptions=True
+                ),
+                timeout=2.5
+            )
+        except asyncio.TimeoutError:
+            logger.debug(f"[WebSearch] Crawl timeout (2.5s) reached for {domain_to_fetch}")
 
         # 4. Extract Verified Quantitative Metrics (Zero Dummy Numbers)
         all_text = " ".join(real_facts + [homepage_summary])
@@ -204,7 +215,7 @@ class WebSearchService:
         if homepage_summary:
             combined_text += f"\n\nLive Website Inspection:\n{homepage_summary}"
 
-        return {
+        res = {
             "query": query,
             "domain": domain_to_fetch,
             "company_name": search_term.capitalize(),
@@ -214,5 +225,7 @@ class WebSearchService:
             "intel_sources": intel_sources,
             "raw_intelligence": combined_text
         }
+        self._CACHE[clean_q] = res
+        return res
 
 web_search_service = WebSearchService()

@@ -133,7 +133,34 @@ export default function LeadDetailPage() {
     setAgentActionLoading("PIPELINE");
     setError(null);
     try {
-      await api.agents.runPipeline(leadId);
+      await api.agents.streamPipeline(leadId, {
+        onResearch: (resData) => {
+          setLead(prev => prev ? {
+            ...prev,
+            latest_research: resData,
+            status: prev.status === "NEW" ? "RESEARCHED" : prev.status
+          } : null);
+        },
+        onQual: (qualData) => {
+          setLead(prev => prev ? {
+            ...prev,
+            latest_qualification: qualData,
+            status: qualData.score >= 50 ? "QUALIFIED" : "DISQUALIFIED"
+          } : null);
+        },
+        onEmail: (emailData) => {
+          setLead(prev => prev ? {
+            ...prev,
+            latest_email: emailData
+          } : null);
+        },
+        onComplete: async () => {
+          await fetchLeadData();
+        },
+        onError: (errMsg) => {
+          setError(errMsg);
+        }
+      });
       await fetchLeadData();
     } catch (err: any) {
       setError(err.message || "Autonomous Agent Pipeline failed to execute");

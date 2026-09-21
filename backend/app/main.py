@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import engine, Base
-from app.api import auth, leads, agents, activity, settings as settings_api
+from app.api import auth, leads, agents, activity, settings as settings_api, stream
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ app.include_router(leads.router, prefix=settings.API_V1_STR)
 app.include_router(agents.router, prefix=settings.API_V1_STR)
 app.include_router(activity.router, prefix=settings.API_V1_STR)
 app.include_router(settings_api.router, prefix=settings.API_V1_STR)
+app.include_router(stream.router, prefix=settings.API_V1_STR)
 
 @app.get("/", tags=["Health"])
 def root():

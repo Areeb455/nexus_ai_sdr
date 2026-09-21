@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -120,10 +121,12 @@ class LLMEngine:
         if self.vertex_client:
             for model_choice in VERTEX_MODELS:
                 try:
-                    response = self.vertex_client.models.generate_content(
-                        model=model_choice,
-                        contents=full_json_prompt
-                    )
+                    def _call_vertex(m=model_choice):
+                        return self.vertex_client.models.generate_content(
+                            model=m,
+                            contents=full_json_prompt
+                        )
+                    response = await asyncio.to_thread(_call_vertex)
                     raw_text = getattr(response, 'text', None)
                     if raw_text:
                         cleaned_text = self._clean_json_str(raw_text)

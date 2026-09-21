@@ -260,6 +260,70 @@ export const api = {
         qualification?: QualificationData;
         email?: EmailData;
       }>(`/leads/${leadId}/pipeline`, { method: "POST" }),
+    streamPipeline: async (
+      leadId: number | string,
+      callbacks: {
+        onStarted?: () => void;
+        onResearch?: (data: ResearchData) => void;
+        onQual?: (data: QualificationData) => void;
+        onEmail?: (data: EmailData) => void;
+        onComplete?: (data: { status: string; message: string }) => void;
+        onError?: (err: string) => void;
+      }
+    ) => {
+      const token = getStoredToken();
+      const res = await fetch(`${API_BASE_URL}/leads/${leadId}/pipeline-stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        let errDetail = `HTTP ${res.status}`;
+        try {
+          const j = await res.json();
+          errDetail = j.detail || errDetail;
+        } catch {}
+        callbacks.onError?.(errDetail);
+        throw new Error(errDetail);
+      }
+
+      if (!res.body) {
+        throw new Error("No response stream available");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          try {
+            const parsed = JSON.parse(trimmed.replace(/^data:\s*/, ""));
+            const { event, data } = parsed;
+            if (event === "started") callbacks.onStarted?.();
+            else if (event === "research_done") callbacks.onResearch?.(data);
+            else if (event === "qual_done") callbacks.onQual?.(data);
+            else if (event === "email_done") callbacks.onEmail?.(data);
+            else if (event === "complete") callbacks.onComplete?.(data);
+            else if (event === "error") callbacks.onError?.(data?.message || "Streaming error");
+          } catch (e) {
+            console.error("[SSE Parse Error]", e, trimmed);
+          }
+        }
+      }
+    },
     sendEmail: (leadId: number | string) =>
       request<Lead>(`/leads/${leadId}`, {
         method: "PATCH",
